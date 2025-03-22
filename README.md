@@ -8,7 +8,7 @@ TransitGo is a cutting-edge mobile and web application developed to modernize th
 
 🪑 Bus Seat Booking
 
- • Reserve bus seats in advance through the app or website.
+ • Reserve bus seats in advance through the app or website./n
  • Check seat availability and select preferred seats for a hassle-free journey.
 
 💳 Oyster Card System
