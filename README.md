@@ -8,21 +8,21 @@ TransitGo is a cutting-edge mobile and web application developed to modernize th
 
 🪑 Bus Seat Booking
 
- #• Reserve bus seats in advance through the app or website.
- • Check seat availability and select preferred seats for a hassle-free journey.
+ - Reserve bus seats in advance through the app or website.
+ - Check seat availability and select preferred seats for a hassle-free journey.
 
 💳 Oyster Card System
 
- • Experience seamless ticketing with a rechargeable digital card.
- • Purchase and reload tickets easily through the app, replacing traditional paper tickets.
- • Enjoy touchless ticket scanning via Bluetooth-enabled QR codes.
+ - Experience seamless ticketing with a rechargeable digital card.
+ - Purchase and reload tickets easily through the app, replacing traditional paper tickets.
+ - Enjoy touchless ticket scanning via Bluetooth-enabled QR codes.
 
 📌 Scope
 
 TransitGo is designed to:
-  • Revolutionize bus transportation with modern booking and ticketing systems.
-  • Enhance operational efficiency for bus operators and improve fleet management.
-  • Reduce delays, improve reliability, and minimize the environmental impact by promoting paperless transactions.
+  - Revolutionize bus transportation with modern booking and ticketing systems.
+  - Enhance operational efficiency for bus operators and improve fleet management.
+  - Reduce delays, improve reliability, and minimize the environmental impact by promoting paperless transactions.
 
 🚀 Vision
 
@@ -30,6 +30,6 @@ TransitGo is designed to:
 
 🛠️ Technologies
     
- • Frontend: Flutter (Mobile App), HTML, CSS, JavaScript, Bootstrap (Website)
- • Backend: PHP
- • Database: MySQL
+ - Frontend: Flutter (Mobile App), HTML, CSS, JavaScript, Bootstrap (Website)
+ - Backend: PHP
+ - Database: MySQL
