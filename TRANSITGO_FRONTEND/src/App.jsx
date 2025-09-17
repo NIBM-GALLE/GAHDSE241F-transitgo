@@ -1,12 +1,14 @@
-import { useState } from 'react'
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import MainLayout from './components/layouts/MainLayout';
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <div><h1 className='text-red-900 text-xl'>Hello Ravindu</h1></div>
-    </>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<MainLayout />} >
+        </Route>
+      </Routes>
+    </BrowserRouter>
   )
 }
 
