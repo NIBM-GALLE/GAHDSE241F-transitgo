@@ -33,7 +33,7 @@ const sidebarSections = [
   {
     header: "BUS REGISTRATION",
     items: [
-      { label: "Registration", icon: <MdOutlineAppRegistration size={16} />, to: "/cashier" }
+      { label: "Registration", icon: <MdOutlineAppRegistration size={16} />, to: "/bus_registration" }
     ]
   },
   {
@@ -68,7 +68,7 @@ const sidebarSections = [
   },
 ];
 
-const Sidebar = ({ sidebarOpen = true, toggleSidebar = () => {}, isMobile = false }) => {
+const Sidebar = ({ sidebarOpen, toggleSidebar, isMobile = false }) => {
   const { logout } = useAuth();
   const location = useLocation();
   const [openSection, setOpenSection] = useState(null);
@@ -93,29 +93,43 @@ const Sidebar = ({ sidebarOpen = true, toggleSidebar = () => {}, isMobile = fals
 
       <aside
         style={{
-          background: "linear-gradient(to bottom, #59AC77 0%, #59AC77 50%, #3A6F43 100%)"
+          background: 'linear-gradient(180deg, #27ae60 0%, #16c98d 100%)',
+          borderRadius: '0 0 0 0',
+          boxShadow: '2px 0 12px rgba(39,174,96,0.08)',
+          width: sidebarOpen ? 296 : 64,
+          transition: 'width 0.3s',
         }}
-        className={`fixed top-0 left-0 h-screen z-50 border-r border-gray-400 shadow-lg transition-all duration-300 ${
-          sidebarOpen
-            ? isMobile
-              ? "w-64 translate-x-0"
-              : "w-64"
-            : isMobile
-            ? "-translate-x-full"
-            : "w-20"
-        }`}
+        className={`fixed top-0 left-0 h-screen z-50 shadow-lg transition-all duration-300`}
       >
         {/* Logo & Toggle */}
-        <div className="flex items-center justify-between px-4 py-5 border-b border-gray-400">
+        <div className="flex items-center justify-between px-4 py-5" style={{ borderBottom: '1px solid #16c98d' }}>
           <img
             src={logo}
             alt="TransitGo Logo"
-            className={`transition-all ${sidebarOpen ? "h-40 w-70" : "h-8 w-auto mx-auto"}`}
-            style={{ objectFit: "contain" }}
+            className={`transition-all`}
+            style={{
+              objectFit: "contain",
+              height: sidebarOpen ? 100 : 32,
+              width: sidebarOpen ? 120 : 32,
+              borderRadius: 8,
+              transition: 'all 0.3s'
+            }}
           />
           <button
             onClick={toggleSidebar}
-            className="text-white hover:text-gray-200 transition ml-2"
+            style={{
+              background: '#fff',
+              color: '#27ae60',
+              border: 'none',
+              borderRadius: 8,
+              padding: '6px 10px',
+              marginLeft: 8,
+              fontSize: 22,
+              cursor: 'pointer',
+              boxShadow: '0 1px 4px rgba(22,201,141,0.08)',
+              transition: 'background 0.2s',
+            }}
+            className="transition ml-2"
           >
             {sidebarOpen ? (
               isMobile ? (
@@ -134,7 +148,16 @@ const Sidebar = ({ sidebarOpen = true, toggleSidebar = () => {}, isMobile = fals
           {sidebarSections.map((section, idx) => (
             <div key={idx}>
               {section.header && sidebarOpen && (
-                <div className="text-xs text-gray-900 font-semibold px-2 py-1 mt-2 mb-1 uppercase tracking-wide">
+                <div style={{
+                  color: '#fff',
+                  fontWeight: 600,
+                  fontSize: 12,
+                  padding: '8px 12px',
+                  margin: '8px 0 4px 0',
+                  letterSpacing: 1,
+                  textTransform: 'uppercase',
+                  opacity: 0.8
+                }}>
                   {section.header}
                 </div>
               )}
@@ -145,15 +168,25 @@ const Sidebar = ({ sidebarOpen = true, toggleSidebar = () => {}, isMobile = fals
                     key={itemIdx}
                     to={item.to}
                     onClick={() => isMobile && toggleSidebar()}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${
-                      isActive
-                        ? "bg-[#1C352D] text-white font-semibold"
-                        : "text-green-950 hover:bg-[#1C352D] hover:text-white"
-                    }`}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12,
+                      padding: '10px 16px',
+                      borderRadius: 8,
+                      fontWeight: isActive ? 700 : 500,
+                      background: isActive ? '#fff' : 'transparent',
+                      color: isActive ? '#27ae60' : '#fff',
+                      fontSize: 15,
+                      marginBottom: 4,
+                      boxShadow: isActive ? '0 1px 4px rgba(22,201,141,0.08)' : 'none',
+                      transition: 'background 0.2s, color 0.2s',
+                      cursor: 'pointer',
+                    }}
                   >
-                    <span className="flex-shrink-0">{item.icon}</span>
+                    <span>{item.icon}</span>
                     {sidebarOpen && (
-                      <span className="text-sm whitespace-nowrap">{item.label}</span>
+                      <span>{item.label}</span>
                     )}
                   </Link>
                 );
@@ -163,20 +196,38 @@ const Sidebar = ({ sidebarOpen = true, toggleSidebar = () => {}, isMobile = fals
         </nav>
 
         {/* Bottom info bar */}
-        <div className="absolute bottom-0 left-0 right-0 px-2 py-3 border-t border-gray-400 bg-[#3A6F43]">
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: '16px 12px',
+          borderTop: '1px solid #16c98d',
+          background: 'rgba(22,201,141,0.12)',
+          borderRadius: '0 0 24px 24px'
+        }}>
           <button
             onClick={async () => await logout()}
-            className={`flex items-center gap-3 p-2 rounded-lg w-full text-green-950 hover:bg-red-500 hover:text-white transition-all ${
-              sidebarOpen ? "justify-start" : "justify-center"
-            }`}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '10px 16px',
+              borderRadius: 8,
+              width: '100%',
+              background: '#fff',
+              color: '#27ae60',
+              fontWeight: 700,
+              border: 'none',
+              boxShadow: '0 1px 4px rgba(22,201,141,0.08)',
+              cursor: 'pointer',
+              transition: 'background 0.2s, color 0.2s',
+              justifyContent: sidebarOpen ? 'flex-start' : 'center'
+            }}
           >
             <FiLogOut size={18} />
-            {sidebarOpen && <span className="text-sm">Logout</span>}
+            {sidebarOpen && <span>Logout</span>}
           </button>
-          {sidebarOpen && (
-            <div className="mt-2 text-xs text-gray-500 text-center">
-            </div>
-          )}
         </div>
       </aside>
     </>
