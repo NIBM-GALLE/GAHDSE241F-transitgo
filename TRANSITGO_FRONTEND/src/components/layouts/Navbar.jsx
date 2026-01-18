@@ -2,7 +2,7 @@ import React from 'react';
 import logo from '../../assets/Logo.png';
 import { MdNotificationsNone } from 'react-icons/md';
 
-const Navbar = () => {
+const Navbar = ({ sidebarWidth }) => {
   return (
     <nav
       style={{
@@ -14,7 +14,7 @@ const Navbar = () => {
         borderBottom: 'none',
         position: 'fixed',
         top: 0,
-        left: 296,
+        left: sidebarWidth,
         right: 0,
         zIndex: 1001,
         height: 64,
