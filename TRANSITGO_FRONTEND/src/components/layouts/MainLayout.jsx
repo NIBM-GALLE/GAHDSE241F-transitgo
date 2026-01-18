@@ -19,7 +19,7 @@ const MainLayout = () => {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      {!isMobile && <Navbar />}
+      {!isMobile && <Navbar sidebarWidth={sidebarOpen ? 296 : 64} />}
       <Sidebar
         sidebarOpen={sidebarOpen}
         toggleSidebar={handleToggleSidebar}
@@ -30,7 +30,8 @@ const MainLayout = () => {
           flex: 1,
           background: '#f4f6fc',
           padding: isMobile ? '32px 8px' : '32px',
-          marginTop: 56,
+          marginTop: isMobile ? 0 : 64,
+          marginLeft: isMobile ? 0 : (sidebarOpen ? 296 : 64),
           position: 'relative'
         }}
       >
