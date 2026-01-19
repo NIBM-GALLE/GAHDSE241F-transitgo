@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebase/firebase';
-import { collection, addDoc, serverTimestamp, getDocs, query, orderBy } from 'firebase/firestore';
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  getDocs,
+  query,
+  orderBy,
+  updateDoc,
+  doc
+} from 'firebase/firestore';
+// added: qrcode generator
+import QRCode from 'qrcode';
 
 const BusRegistration = () => {
   const [form, setForm] = useState({
@@ -20,29 +31,26 @@ const BusRegistration = () => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  // added: fetch buses from Firestore
+  // fetch buses (include qrCode)
   const fetchBuses = async () => {
     try {
       const q = query(collection(db, 'buses'), orderBy('createdAt', 'desc'));
       const snap = await getDocs(q);
-      const list = snap.docs.map(doc => {
-        const d = doc.data() || {};
+      const list = snap.docs.map(docSnap => {
+        const d = docSnap.data() || {};
         let createdAt = null;
-        if (d.createdAt && d.createdAt.toDate) {
-          createdAt = d.createdAt.toDate().toISOString();
-        } else if (d.createdAtClient) {
-          createdAt = d.createdAtClient;
-        } else if (d.createdAt) {
-          createdAt = String(d.createdAt);
-        }
+        if (d.createdAt && d.createdAt.toDate) createdAt = d.createdAt.toDate().toISOString();
+        else if (d.createdAtClient) createdAt = d.createdAtClient;
+        else if (d.createdAt) createdAt = String(d.createdAt);
         return {
-          id: doc.id,
+          id: docSnap.id,
           busNumber: d.busNumber || null,
           driverName: d.driverName || null,
           route: d.route || null,
           capacity: d.capacity ?? null,
           contact: d.contact ?? null,
           createdAt,
+          qrCode: d.qrCode ?? null, // include qrCode
         };
       });
       setBuses(list);
@@ -67,7 +75,9 @@ const BusRegistration = () => {
 
     try {
       const clientCreatedAt = new Date().toISOString();
-      await addDoc(collection(db, 'buses'), {
+
+      // create the doc first to obtain id
+      const docRef = await addDoc(collection(db, 'buses'), {
         busNumber: form.busNumber,
         driverName: form.driverName,
         route: form.route,
@@ -76,6 +86,15 @@ const BusRegistration = () => {
         createdAt: serverTimestamp(),
         createdAtClient: clientCreatedAt
       });
+
+      // generate QR payload - you can change this to a URL or structured payload
+      const qrPayload = `transitgo://bus/${docRef.id}`; // use document id for uniqueness
+
+      // generate data URL (PNG) for the QR code
+      const qrDataUrl = await QRCode.toDataURL(qrPayload, { margin: 2, width: 300 });
+
+      // update doc with qrCode field
+      await updateDoc(doc(db, 'buses', docRef.id), { qrCode: qrDataUrl });
 
       setStatus({ type: 'success', msg: 'Bus registered successfully 🚍' });
       setForm({ busNumber: '', driverName: '', route: '', capacity: '', contact: '' });
@@ -92,7 +111,6 @@ const BusRegistration = () => {
   return (
     <div className="min-h-screen bg-gray-100 flex items-start justify-center p-4">
       <div className="bg-white w-full max-w-4xl rounded-2xl shadow-lg p-6">
-        
         <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">
           🚌 Bus Registration
         </h2>
@@ -208,12 +226,13 @@ const BusRegistration = () => {
                   <th className="px-4 py-2">Route</th>
                   <th className="px-4 py-2">Capacity</th>
                   <th className="px-4 py-2">Contact</th>
+                  <th className="px-4 py-2">QR</th>
                   <th className="px-4 py-2">Created At</th>
                 </tr>
               </thead>
               <tbody>
                 {buses.length === 0 && (
-                  <tr><td colSpan="6" className="px-4 py-6 text-center text-gray-500">No buses registered yet.</td></tr>
+                  <tr><td colSpan="7" className="px-4 py-6 text-center text-gray-500">No buses registered yet.</td></tr>
                 )}
                 {buses.map((b) => (
                   <tr
@@ -226,6 +245,18 @@ const BusRegistration = () => {
                     <td className="px-4 py-2">{b.route}</td>
                     <td className="px-4 py-2">{b.capacity ?? '-'}</td>
                     <td className="px-4 py-2">{b.contact ?? '-'}</td>
+                    <td className="px-4 py-2">
+                      {b.qrCode ? (
+                        <img
+                          src={b.qrCode}
+                          alt={`QR for ${b.busNumber}`}
+                          style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6 }}
+                          title="Click row to view full QR"
+                        />
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
                     <td className="px-4 py-2">{b.createdAt ? new Date(b.createdAt).toLocaleString() : '-'}</td>
                   </tr>
                 ))}
@@ -262,12 +293,18 @@ const BusRegistration = () => {
                   <div className="text-sm text-gray-500">Created At</div>
                   <div className="font-medium">{selectedBus.createdAt ? new Date(selectedBus.createdAt).toLocaleString() : '-'}</div>
                 </div>
+                {/* QR Code display */}
+                <div className="sm:col-span-2">
+                  <div className="text-sm text-gray-500">QR Code</div>
+                  {selectedBus.qrCode ? (
+                    <img src={selectedBus.qrCode} alt="Bus QR" style={{ width: 160, height: 160 }} />
+                  ) : (
+                    <div className="text-gray-500">No QR available</div>
+                  )}
+                </div>
               </div>
               <div className="mt-4">
-                <button
-                  onClick={() => setSelectedBus(null)}
-                  className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
-                >
+                <button onClick={() => setSelectedBus(null)} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">
                   Close
                 </button>
               </div>
