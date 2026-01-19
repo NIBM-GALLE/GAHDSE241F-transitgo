@@ -32,7 +32,8 @@ const MainLayout = () => {
           padding: isMobile ? '32px 8px' : '32px',
           marginTop: isMobile ? 0 : 64,
           marginLeft: isMobile ? 0 : (sidebarOpen ? 296 : 64),
-          position: 'relative'
+          position: 'relative',
+          transition: 'margin-left 0.3s ease-in-out'
         }}
       >
         <Outlet />

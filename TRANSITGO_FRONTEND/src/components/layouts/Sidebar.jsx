@@ -86,7 +86,7 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, isMobile = false }) => {
       {/* Mobile overlay */}
       {isMobile && sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40"
+          className="fixed inset-0 bg-white bg-opacity-50 z-40"
           onClick={toggleSidebar}
         />
       )}
@@ -97,24 +97,29 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, isMobile = false }) => {
           borderRadius: '0 0 0 0',
           boxShadow: '2px 0 12px rgba(39,174,96,0.08)',
           width: sidebarOpen ? 296 : 64,
-          transition: 'width 0.3s',
+          transition: 'width 0.3s ease-in-out',
         }}
-        className={`fixed top-0 left-0 h-screen z-50 shadow-lg transition-all duration-300`}
+        className={`fixed top-0 left-0 h-screen z-50 shadow-lg`}
       >
         {/* Logo & Toggle */}
-        <div className="flex items-center justify-between px-4 py-5" style={{ borderBottom: '1px solid #16c98d' }}>
-          <img
-            src={logo}
-            alt="TransitGo Logo"
-            className={`transition-all`}
-            style={{
-              objectFit: "contain",
-              height: sidebarOpen ? 100 : 32,
-              width: sidebarOpen ? 120 : 32,
-              borderRadius: 8,
-              transition: 'all 0.3s'
-            }}
-          />
+        <div 
+          className={`flex items-center py-5 ${sidebarOpen ? 'justify-between px-4' : 'justify-center px-2'}`} 
+          style={{ borderBottom: '1px solid #16c98d' }}
+        >
+          {sidebarOpen && (
+            <img
+              src={logo}
+              alt="TransitGo Logo"
+              className={`transition-all`}
+              style={{
+                objectFit: "contain",
+                height: 100,
+                width: 120,
+                borderRadius: 8,
+                transition: 'opacity 0.3s ease-in-out, transform 0.3s ease-in-out'
+              }}
+            />
+          )}
           <button
             onClick={toggleSidebar}
             style={{
@@ -123,13 +128,16 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, isMobile = false }) => {
               border: 'none',
               borderRadius: 8,
               padding: '6px 10px',
-              marginLeft: 8,
               fontSize: 22,
               cursor: 'pointer',
               boxShadow: '0 1px 4px rgba(22,201,141,0.08)',
               transition: 'background 0.2s',
+              marginLeft: sidebarOpen ? 8 : 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
-            className="transition ml-2"
+            className="transition"
           >
             {sidebarOpen ? (
               isMobile ? (
@@ -156,7 +164,8 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, isMobile = false }) => {
                   margin: '8px 0 4px 0',
                   letterSpacing: 1,
                   textTransform: 'uppercase',
-                  opacity: 0.8
+                  opacity: 0.8,
+                  transition: 'opacity 0.3s ease-in-out'
                 }}>
                   {section.header}
                 </div>
@@ -186,7 +195,7 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, isMobile = false }) => {
                   >
                     <span>{item.icon}</span>
                     {sidebarOpen && (
-                      <span>{item.label}</span>
+                      <span style={{ transition: 'opacity 0.3s ease-in-out' }}>{item.label}</span>
                     )}
                   </Link>
                 );
@@ -226,7 +235,7 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, isMobile = false }) => {
             }}
           >
             <FiLogOut size={18} />
-            {sidebarOpen && <span>Logout</span>}
+            {sidebarOpen && <span style={{ transition: 'opacity 0.3s ease-in-out' }}>Logout</span>}
           </button>
         </div>
       </aside>

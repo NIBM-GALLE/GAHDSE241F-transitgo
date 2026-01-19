@@ -20,6 +20,7 @@ const Navbar = ({ sidebarWidth }) => {
         height: 64,
         borderRadius: '0 0 0 0',
         boxShadow: '0 2px 12px rgba(39,174,96,0.08)',
+        transition: 'left 0.3s ease-in-out'
       }}
     >
       <img
