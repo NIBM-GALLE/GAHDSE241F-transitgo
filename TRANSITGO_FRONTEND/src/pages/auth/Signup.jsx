@@ -11,7 +11,7 @@ const Signup = () => {
           <img
             src={SignupImage}
             alt="Signup illustration"
-            className="max-h-[480px] w-auto object-contain rounded-2xl shadow-2xl"
+            className="h-158 w-auto object-contain rounded-2xl shadow-2xl"
           />
         {/* </div> */}
 
