@@ -18,12 +18,14 @@ const BusRegistration = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // basic validation
+
     if (!form.busNumber || !form.driverName || !form.route) {
-      setStatus({ type: 'error', msg: 'Please fill required fields.' });
+      setStatus({ type: 'error', msg: 'Please fill all required fields.' });
       return;
     }
+
     setStatus({ type: 'loading' });
+
     try {
       await addDoc(collection(db, 'buses'), {
         busNumber: form.busNumber,
@@ -33,45 +35,123 @@ const BusRegistration = () => {
         contact: form.contact || null,
         createdAt: serverTimestamp()
       });
-      setStatus({ type: 'success', msg: 'Bus registered successfully.' });
+
+      setStatus({ type: 'success', msg: 'Bus registered successfully 🚍' });
       setForm({ busNumber: '', driverName: '', route: '', capacity: '', contact: '' });
     } catch (error) {
-      console.error('Firestore write error:', error);
+      console.error(error);
       setStatus({ type: 'error', msg: 'Failed to register bus.' });
     }
   };
 
   return (
-    <div>
-      <h2>Bus Registration</h2>
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label>Bus Number *</label>
-          <input name="busNumber" value={form.busNumber} onChange={handleChange} />
-        </div>
-        <div>
-          <label>Driver Name *</label>
-          <input name="driverName" value={form.driverName} onChange={handleChange} />
-        </div>
-        <div>
-          <label>Route *</label>
-          <input name="route" value={form.route} onChange={handleChange} />
-        </div>
-        <div>
-          <label>Capacity</label>
-          <input name="capacity" value={form.capacity} onChange={handleChange} type="number" />
-        </div>
-        <div>
-          <label>Contact</label>
-          <input name="contact" value={form.contact} onChange={handleChange} />
-        </div>
-        <button type="submit" disabled={status?.type === 'loading'}>
-          {status?.type === 'loading' ? 'Saving...' : 'Register Bus'}
-        </button>
-      </form>
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-xl rounded-2xl shadow-lg p-6">
+        
+        <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">
+          🚌 Bus Registration
+        </h2>
 
-      {status?.type === 'success' && <p style={{ color: 'green' }}>{status.msg}</p>}
-      {status?.type === 'error' && <p style={{ color: 'red' }}>{status.msg}</p>}
+        <form onSubmit={handleSubmit} className="space-y-4">
+
+          {/* Bus Number */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600">
+              Bus Number <span className="text-red-500">*</span>
+            </label>
+            <input
+              name="busNumber"
+              value={form.busNumber}
+              onChange={handleChange}
+              className="mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="e.g. NB-1234"
+            />
+          </div>
+
+          {/* Driver Name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600">
+              Driver Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              name="driverName"
+              value={form.driverName}
+              onChange={handleChange}
+              className="mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="Driver full name"
+            />
+          </div>
+
+          {/* Route */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600">
+              Route <span className="text-red-500">*</span>
+            </label>
+            <input
+              name="route"
+              value={form.route}
+              onChange={handleChange}
+              className="mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="Colombo – Kandy"
+            />
+          </div>
+
+          {/* Capacity */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600">
+              Capacity
+            </label>
+            <input
+              name="capacity"
+              type="number"
+              value={form.capacity}
+              onChange={handleChange}
+              className="mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="e.g. 54"
+            />
+          </div>
+
+          {/* Contact */}
+          <div>
+            <label className="block text-sm font-medium text-gray-600">
+              Contact Number
+            </label>
+            <input
+              name="contact"
+              value={form.contact}
+              onChange={handleChange}
+              className="mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+              placeholder="+94 7X XXX XXXX"
+            />
+          </div>
+
+          {/* Button */}
+          <button
+            type="submit"
+            disabled={status?.type === 'loading'}
+            className={`w-full py-2 rounded-lg text-white font-semibold transition
+              ${status?.type === 'loading'
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700'}
+            `}
+          >
+            {status?.type === 'loading' ? 'Saving...' : 'Register Bus'}
+          </button>
+        </form>
+
+        {/* Status Messages */}
+        {status?.type === 'success' && (
+          <p className="mt-4 text-green-600 text-center font-medium">
+            {status.msg}
+          </p>
+        )}
+
+        {status?.type === 'error' && (
+          <p className="mt-4 text-red-600 text-center font-medium">
+            {status.msg}
+          </p>
+        )}
+      </div>
     </div>
   );
 };
