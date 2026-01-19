@@ -73,6 +73,16 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, isMobile = false }) => {
   const location = useLocation();
   const [openSection, setOpenSection] = useState(null);
 
+  const textTransition = {
+    transition: "opacity 0.25s ease, transform 0.25s ease, width 0.25s ease",
+    opacity: sidebarOpen ? 1 : 0,
+    transform: sidebarOpen ? "translateX(0)" : "translateX(-8px)",
+    width: sidebarOpen ? "auto" : 0,
+    overflow: "hidden",
+    whiteSpace: "nowrap",
+    pointerEvents: sidebarOpen ? "auto" : "none",
+  };
+
   useEffect(() => {
     if (isMobile && sidebarOpen) {
       document.body.style.overflow = "hidden";
@@ -155,18 +165,25 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, isMobile = false }) => {
         <nav className="mt-2 px-2 space-y-2">
           {sidebarSections.map((section, idx) => (
             <div key={idx}>
-              {section.header && sidebarOpen && (
-                <div style={{
-                  color: '#fff',
-                  fontWeight: 600,
-                  fontSize: 12,
-                  padding: '8px 12px',
-                  margin: '8px 0 4px 0',
-                  letterSpacing: 1,
-                  textTransform: 'uppercase',
-                  opacity: 0.8,
-                  transition: 'opacity 0.3s ease-in-out'
-                }}>
+              {section.header && (
+                <div
+                  aria-hidden={!sidebarOpen}
+                  style={{
+                    color: "#fff",
+                    fontWeight: 600,
+                    fontSize: 12,
+                    padding: sidebarOpen ? "8px 12px" : 0,
+                    margin: sidebarOpen ? "8px 0 4px 0" : 0,
+                    letterSpacing: 1,
+                    textTransform: "uppercase",
+                    opacity: sidebarOpen ? 0.8 : 0,
+                    maxHeight: sidebarOpen ? 40 : 0,
+                    overflow: "hidden",
+                    transition:
+                      "opacity 0.25s ease, max-height 0.25s ease, padding 0.25s ease, margin 0.25s ease",
+                    pointerEvents: sidebarOpen ? "auto" : "none",
+                  }}
+                >
                   {section.header}
                 </div>
               )}
@@ -180,7 +197,7 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, isMobile = false }) => {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 12,
+                      gap: sidebarOpen ? 12 : 0,
                       padding: '10px 16px',
                       borderRadius: 8,
                       fontWeight: isActive ? 700 : 500,
@@ -194,9 +211,7 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, isMobile = false }) => {
                     }}
                   >
                     <span>{item.icon}</span>
-                    {sidebarOpen && (
-                      <span style={{ transition: 'opacity 0.3s ease-in-out' }}>{item.label}</span>
-                    )}
+                    <span style={textTransition}>{item.label}</span>
                   </Link>
                 );
               })}
@@ -220,7 +235,7 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, isMobile = false }) => {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 12,
+              gap: sidebarOpen ? 12 : 0,
               padding: '10px 16px',
               borderRadius: 8,
               width: '100%',
@@ -235,7 +250,7 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, isMobile = false }) => {
             }}
           >
             <FiLogOut size={18} />
-            {sidebarOpen && <span style={{ transition: 'opacity 0.3s ease-in-out' }}>Logout</span>}
+            <span style={textTransition}>Logout</span>
           </button>
         </div>
       </aside>
