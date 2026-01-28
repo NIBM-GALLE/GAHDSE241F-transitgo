@@ -27,6 +27,10 @@ const BusRegistration = () => {
   const [buses, setBuses] = useState([]);
   const [selectedBus, setSelectedBus] = useState(null);
 
+  const labelClass = "block text-sm font-medium text-gray-700";
+  const inputClass =
+    "mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100";
+
   const handleChange = (e) => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
   };
@@ -109,110 +113,153 @@ const BusRegistration = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-start justify-center p-4">
-      <div className="bg-white w-full max-w-4xl rounded-2xl shadow-lg p-6">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">
-          🚌 Bus Registration
-        </h2>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Bus Number */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600">
-              Bus Number <span className="text-red-500">*</span>
-            </label>
-            <input
-              name="busNumber"
-              value={form.busNumber}
-              onChange={handleChange}
-              className="mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-              placeholder="e.g. NB-1234"
-            />
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-gray-100 flex items-start justify-center p-4">
+      <div className="w-full max-w-5xl">
+        <div className="rounded-3xl border border-gray-200 bg-white shadow-lg">
+          <div className="rounded-3xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-2xl font-bold text-white">Bus Registration</h2>
+                <p className="mt-1 text-sm text-blue-100">
+                  Register a new bus and generate a QR code for quick identification.
+                </p>
+              </div>
+              <div className="rounded-2xl bg-white/10 px-4 py-2 text-sm text-white/90">
+                Fields marked <span className="font-semibold text-white">*</span> are required
+              </div>
+            </div>
           </div>
 
-          {/* Driver Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600">
-              Driver Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              name="driverName"
-              value={form.driverName}
-              onChange={handleChange}
-              className="mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-              placeholder="Driver full name"
-            />
-          </div>
+          <div className="p-6">
+            <form onSubmit={handleSubmit}>
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Bus details</h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Enter the bus number, driver, route and optional details.
+                    </p>
+                  </div>
+                </div>
 
-          {/* Route */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600">
-              Route <span className="text-red-500">*</span>
-            </label>
-            <input
-              name="route"
-              value={form.route}
-              onChange={handleChange}
-              className="mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-              placeholder="Colombo – Kandy"
-            />
-          </div>
+                <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {/* Bus Number */}
+                  <div>
+                    <label className={labelClass}>
+                      Bus Number <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      name="busNumber"
+                      value={form.busNumber}
+                      onChange={handleChange}
+                      required
+                      className={inputClass}
+                      placeholder="e.g. NB-1234"
+                      autoComplete="off"
+                    />
+                  </div>
 
-          {/* Capacity */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600">
-              Capacity
-            </label>
-            <input
-              name="capacity"
-              type="number"
-              value={form.capacity}
-              onChange={handleChange}
-              className="mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-              placeholder="e.g. 54"
-            />
-          </div>
+                  {/* Driver Name */}
+                  <div>
+                    <label className={labelClass}>
+                      Driver Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      name="driverName"
+                      value={form.driverName}
+                      onChange={handleChange}
+                      required
+                      className={inputClass}
+                      placeholder="Driver full name"
+                      autoComplete="name"
+                    />
+                  </div>
 
-          {/* Contact */}
-          <div>
-            <label className="block text-sm font-medium text-gray-600">
-              Contact Number
-            </label>
-            <input
-              name="contact"
-              value={form.contact}
-              onChange={handleChange}
-              className="mt-1 w-full rounded-lg border px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-              placeholder="+94 7X XXX XXXX"
-            />
-          </div>
+                  {/* Route */}
+                  <div className="md:col-span-2">
+                    <label className={labelClass}>
+                      Route <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      name="route"
+                      value={form.route}
+                      onChange={handleChange}
+                      required
+                      className={inputClass}
+                      placeholder="e.g. Colombo – Kandy"
+                      autoComplete="off"
+                    />
+                  </div>
 
-          {/* Button */}
-          <button
-            type="submit"
-            disabled={status?.type === 'loading'}
-            className={`w-full py-2 rounded-lg text-white font-semibold transition
-              ${status?.type === 'loading'
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700'}
-            `}
-          >
-            {status?.type === 'loading' ? 'Saving...' : 'Register Bus'}
-          </button>
-        </form>
+                  {/* Capacity */}
+                  <div>
+                    <label className={labelClass}>Capacity</label>
+                    <input
+                      name="capacity"
+                      type="number"
+                      min="0"
+                      value={form.capacity}
+                      onChange={handleChange}
+                      className={inputClass}
+                      placeholder="e.g. 54"
+                      inputMode="numeric"
+                    />
+                  </div>
 
-        {/* Status Messages */}
-        {status?.type === 'success' && (
-          <p className="mt-4 text-green-600 text-center font-medium">
-            {status.msg}
-          </p>
-        )}
+                  {/* Contact */}
+                  <div>
+                    <label className={labelClass}>Contact Number</label>
+                    <input
+                      name="contact"
+                      value={form.contact}
+                      onChange={handleChange}
+                      className={inputClass}
+                      placeholder="e.g. +94 7X XXX XXXX"
+                      inputMode="tel"
+                      autoComplete="tel"
+                    />
+                  </div>
+                </div>
 
-        {status?.type === 'error' && (
-          <p className="mt-4 text-red-600 text-center font-medium">
-            {status.msg}
-          </p>
-        )}
+                {/* Status Messages */}
+                {status?.type === 'success' && (
+                  <div className="mt-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-green-800">
+                    <div className="font-medium">{status.msg}</div>
+                  </div>
+                )}
+
+                {status?.type === 'error' && (
+                  <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800">
+                    <div className="font-medium">{status.msg}</div>
+                  </div>
+                )}
+
+                <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setForm({ busNumber: '', driverName: '', route: '', capacity: '', contact: '' });
+                      setStatus(null);
+                    }}
+                    className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50"
+                  >
+                    Clear
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={status?.type === 'loading'}
+                    className={`inline-flex items-center justify-center rounded-xl px-4 py-2 font-semibold text-white shadow-sm transition
+                      ${status?.type === 'loading'
+                        ? 'bg-gray-400 cursor-not-allowed'
+                        : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200'}
+                    `}
+                  >
+                    {status?.type === 'loading' ? 'Saving...' : 'Register Bus'}
+                  </button>
+                </div>
+              </div>
+            </form>
 
         {/* Buses Table */}
         <div className="mt-8">
@@ -311,7 +358,8 @@ const BusRegistration = () => {
             </div>
           )}
         </div>
-
+          </div>
+        </div>
       </div>
     </div>
   );
