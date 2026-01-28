@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { db } from '../../firebase/firebase';
+import React, { useState, useEffect } from "react";
+import { db } from "../../firebase/firebase";
 import {
   collection,
   addDoc,
@@ -8,42 +8,69 @@ import {
   query,
   orderBy,
   updateDoc,
-  doc
-} from 'firebase/firestore';
-// added: qrcode generator
-import QRCode from 'qrcode';
+  doc,
+} from "firebase/firestore";
+import QRCode from "qrcode";
 
 const BusRegistration = () => {
   const [form, setForm] = useState({
-    busNumber: '',
-    driverName: '',
-    route: '',
-    capacity: '',
-    contact: ''
+    busNumber: "",
+    driverName: "",
+    routeId: "",
+    capacity: "",
+    contact: "",
   });
   const [status, setStatus] = useState(null);
-
-  // added: buses list and selected bus
   const [buses, setBuses] = useState([]);
   const [selectedBus, setSelectedBus] = useState(null);
+  const [availableRoutes, setAvailableRoutes] = useState([]);
+  const [routeLoading, setRouteLoading] = useState(false);
 
   const labelClass = "block text-sm font-medium text-gray-700";
   const inputClass =
     "mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100";
 
-  const handleChange = (e) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  // Fetch available routes from Firestore
+  const fetchAvailableRoutes = async () => {
+    try {
+      setRouteLoading(true);
+      const snapshot = await getDocs(collection(db, "routes"));
+      const routeList = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        routeNumber: docSnap.data().routeNumber,
+        start: docSnap.data().start,
+        destination: docSnap.data().destination,
+        via: docSnap.data().via || "",
+        fare: docSnap.data().fare || 0,
+        status: docSnap.data().status || "Active",
+        displayText: `${docSnap.data().routeNumber} - ${docSnap.data().start} to ${docSnap.data().destination}`,
+      }));
+      setAvailableRoutes(routeList);
+    } catch (err) {
+      console.error("Error fetching routes:", err);
+    } finally {
+      setRouteLoading(false);
+    }
   };
 
-  // fetch buses (include qrCode)
+  useEffect(() => {
+    fetchBuses();
+    fetchAvailableRoutes();
+  }, []);
+
+  const handleChange = (e) => {
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
   const fetchBuses = async () => {
     try {
-      const q = query(collection(db, 'buses'), orderBy('createdAt', 'desc'));
+      const q = query(collection(db, "buses"), orderBy("createdAt", "desc"));
       const snap = await getDocs(q);
-      const list = snap.docs.map(docSnap => {
+      const list = snap.docs.map((docSnap) => {
         const d = docSnap.data() || {};
         let createdAt = null;
-        if (d.createdAt && d.createdAt.toDate) createdAt = d.createdAt.toDate().toISOString();
+        if (d.createdAt && d.createdAt.toDate)
+          createdAt = d.createdAt.toDate().toISOString();
         else if (d.createdAtClient) createdAt = d.createdAtClient;
         else if (d.createdAt) createdAt = String(d.createdAt);
         return {
@@ -54,88 +81,173 @@ const BusRegistration = () => {
           capacity: d.capacity ?? null,
           contact: d.contact ?? null,
           createdAt,
-          qrCode: d.qrCode ?? null, // include qrCode
+          qrCode: d.qrCode ?? null,
         };
       });
       setBuses(list);
     } catch (err) {
-      console.error('fetchBuses error:', err);
+      console.error("fetchBuses error:", err);
     }
   };
-
-  useEffect(() => {
-    fetchBuses();
-  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!form.busNumber || !form.driverName || !form.route) {
-      setStatus({ type: 'error', msg: 'Please fill all required fields.' });
+    if (!form.busNumber || !form.driverName || !form.routeId) {
+      setStatus({ type: "error", msg: "Please fill all required fields." });
       return;
     }
 
-    setStatus({ type: 'loading' });
+    setStatus({ type: "loading" });
 
     try {
-      const clientCreatedAt = new Date().toISOString();
+      const selectedRoute = availableRoutes.find((r) => r.id === form.routeId);
 
-      // create the doc first to obtain id
-      const docRef = await addDoc(collection(db, 'buses'), {
+      const docRef = await addDoc(collection(db, "buses"), {
         busNumber: form.busNumber,
         driverName: form.driverName,
-        route: form.route,
+        routeId: selectedRoute.id, // ✅ saved
+        routeNumber: selectedRoute.routeNumber, // ✅ saved
         capacity: form.capacity ? Number(form.capacity) : null,
         contact: form.contact || null,
         createdAt: serverTimestamp(),
-        createdAtClient: clientCreatedAt
       });
 
-      // generate QR payload - you can change this to a URL or structured payload
-      const qrPayload = `transitgo://bus/${docRef.id}`; // use document id for uniqueness
+      const qrPayload = `transitgo://bus/${docRef.id}`;
+      const qrDataUrl = await QRCode.toDataURL(qrPayload);
 
-      // generate data URL (PNG) for the QR code
-      const qrDataUrl = await QRCode.toDataURL(qrPayload, { margin: 2, width: 300 });
+      await updateDoc(doc(db, "buses", docRef.id), {
+        qrCode: qrDataUrl,
+      });
 
-      // update doc with qrCode field
-      await updateDoc(doc(db, 'buses', docRef.id), { qrCode: qrDataUrl });
-
-      setStatus({ type: 'success', msg: 'Bus registered successfully 🚍' });
-      setForm({ busNumber: '', driverName: '', route: '', capacity: '', contact: '' });
-
-      // refresh list and clear selection
-      await fetchBuses();
-      setSelectedBus(null);
-    } catch (error) {
-      console.error(error);
-      setStatus({ type: 'error', msg: 'Failed to register bus.' });
+      setStatus({ type: "success", msg: "Bus registered successfully 🚍" });
+      setForm({
+        busNumber: "",
+        driverName: "",
+        routeId: "",
+        capacity: "",
+        contact: "",
+      });
+      fetchBuses();
+    } catch (err) {
+      console.error(err);
+      setStatus({ type: "error", msg: "Failed to register bus." });
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-gray-100 flex items-start justify-center p-4">
-      <div className="w-full max-w-5xl">
+      <div className="w-full max-w-6xl">
         <div className="rounded-3xl border border-gray-200 bg-white shadow-lg">
           <div className="rounded-3xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-2xl font-bold text-white">Bus Registration</h2>
+                <h2 className="text-2xl font-bold text-white">
+                  Bus Registration
+                </h2>
                 <p className="mt-1 text-sm text-blue-100">
-                  Register a new bus and generate a QR code for quick identification.
+                  Register a new bus and generate a QR code for quick
+                  identification.
                 </p>
               </div>
               <div className="rounded-2xl bg-white/10 px-4 py-2 text-sm text-white/90">
-                Fields marked <span className="font-semibold text-white">*</span> are required
+                Fields marked{" "}
+                <span className="font-semibold text-white">*</span> are required
               </div>
             </div>
           </div>
 
           <div className="p-6">
+            {/* Route List Section */}
+            {!routeLoading && availableRoutes.length > 0 && (
+              <div className="mb-8 rounded-2xl border border-gray-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-6 shadow-sm">
+                <h3 className="mb-4 text-lg font-semibold text-gray-900">
+                  📋 Available Routes
+                </h3>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  {availableRoutes.map((route) => (
+                    <div
+                      key={route.id}
+                      onClick={() =>
+                        setForm((prev) => ({
+                          ...prev,
+                          route: route.displayText,
+                        }))
+                      }
+                      style={{
+                        cursor: "pointer",
+                        padding: "12px 16px",
+                        borderRadius: "8px",
+                        border:
+                          form.route === route.displayText
+                            ? "2px solid #3b82f6"
+                            : "1px solid #e5e7eb",
+                        backgroundColor:
+                          form.route === route.displayText ? "#dbeafe" : "#fff",
+                        transition: "all 0.2s ease",
+                        boxShadow:
+                          form.route === route.displayText
+                            ? "0 0 0 3px rgba(59, 130, 246, 0.1)"
+                            : "none",
+                      }}
+                      className="hover:shadow-md"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-bold text-blue-600">
+                            {route.routeNumber}
+                          </p>
+                          <p className="mt-1 text-sm text-gray-700">
+                            {route.start}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            → {route.destination}
+                          </p>
+                          {route.via && (
+                            <p className="mt-1 text-xs text-gray-500">
+                              Via: {route.via}
+                            </p>
+                          )}
+                        </div>
+                        <div className="ml-2 text-right">
+                          <p className="text-sm font-semibold text-green-600">
+                            Rs.{route.fare}
+                          </p>
+                          <span
+                            style={{
+                              display: "inline-block",
+                              padding: "2px 6px",
+                              borderRadius: "4px",
+                              backgroundColor:
+                                route.status === "Active"
+                                  ? "#d4edda"
+                                  : "#f8d7da",
+                              color:
+                                route.status === "Active"
+                                  ? "#155724"
+                                  : "#721c24",
+                              fontSize: "11px",
+                              fontWeight: "bold",
+                              marginTop: "4px",
+                            }}
+                          >
+                            {route.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit}>
               <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Bus details</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Bus details
+                    </h3>
                     <p className="mt-1 text-sm text-gray-500">
                       Enter the bus number, driver, route and optional details.
                     </p>
@@ -180,15 +292,50 @@ const BusRegistration = () => {
                     <label className={labelClass}>
                       Route <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      name="route"
-                      value={form.route}
+                    <select
+                      name="routeId"
+                      value={form.routeId}
                       onChange={handleChange}
                       required
                       className={inputClass}
-                      placeholder="e.g. Colombo – Kandy"
-                      autoComplete="off"
-                    />
+                    >
+                      <option value="">-- Select a route --</option>
+                      {availableRoutes.map((route) => (
+                        <option key={route.id} value={route.id}>
+                          {route.routeNumber} - {route.start} to{" "}
+                          {route.destination}
+                        </option>
+                      ))}
+                    </select>
+
+                    {form.routeId &&
+                      (() => {
+                        const r = availableRoutes.find(
+                          (rt) => rt.id === form.routeId,
+                        );
+                        if (!r) return null;
+                        return (
+                          <div className="mt-2 rounded-lg bg-blue-50 p-3 text-sm">
+                            <p>
+                              <b>Route No:</b> {r.routeNumber}
+                            </p>
+                            <p>
+                              <b>From:</b> {r.start}
+                            </p>
+                            <p>
+                              <b>To:</b> {r.destination}
+                            </p>
+                            {r.via && (
+                              <p>
+                                <b>Via:</b> {r.via}
+                              </p>
+                            )}
+                            <p>
+                              <b>Fare:</b> Rs. {r.fare}
+                            </p>
+                          </div>
+                        );
+                      })()}
                   </div>
 
                   {/* Capacity */}
@@ -222,13 +369,13 @@ const BusRegistration = () => {
                 </div>
 
                 {/* Status Messages */}
-                {status?.type === 'success' && (
+                {status?.type === "success" && (
                   <div className="mt-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-green-800">
                     <div className="font-medium">{status.msg}</div>
                   </div>
                 )}
 
-                {status?.type === 'error' && (
+                {status?.type === "error" && (
                   <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800">
                     <div className="font-medium">{status.msg}</div>
                   </div>
@@ -238,7 +385,13 @@ const BusRegistration = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      setForm({ busNumber: '', driverName: '', route: '', capacity: '', contact: '' });
+                      setForm({
+                        busNumber: "",
+                        driverName: "",
+                        route: "",
+                        capacity: "",
+                        contact: "",
+                      });
                       setStatus(null);
                     }}
                     className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50"
@@ -248,116 +401,149 @@ const BusRegistration = () => {
 
                   <button
                     type="submit"
-                    disabled={status?.type === 'loading'}
+                    disabled={status?.type === "loading"}
                     className={`inline-flex items-center justify-center rounded-xl px-4 py-2 font-semibold text-white shadow-sm transition
-                      ${status?.type === 'loading'
-                        ? 'bg-gray-400 cursor-not-allowed'
-                        : 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200'}
+                      ${
+                        status?.type === "loading"
+                          ? "bg-gray-400 cursor-not-allowed"
+                          : "bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200"
+                      }
                     `}
                   >
-                    {status?.type === 'loading' ? 'Saving...' : 'Register Bus'}
+                    {status?.type === "loading" ? "Saving..." : "Register Bus"}
                   </button>
                 </div>
               </div>
             </form>
 
-        {/* Buses Table */}
-        <div className="mt-8">
-          <h3 className="text-lg font-semibold mb-3">Registered Buses</h3>
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white">
-              <thead>
-                <tr className="bg-gray-100 text-left">
-                  <th className="px-4 py-2">Bus Number</th>
-                  <th className="px-4 py-2">Driver</th>
-                  <th className="px-4 py-2">Route</th>
-                  <th className="px-4 py-2">Capacity</th>
-                  <th className="px-4 py-2">Contact</th>
-                  <th className="px-4 py-2">QR</th>
-                  <th className="px-4 py-2">Created At</th>
-                </tr>
-              </thead>
-              <tbody>
-                {buses.length === 0 && (
-                  <tr><td colSpan="7" className="px-4 py-6 text-center text-gray-500">No buses registered yet.</td></tr>
-                )}
-                {buses.map((b) => (
-                  <tr
-                    key={b.id}
-                    className={`border-t cursor-pointer ${selectedBus && selectedBus.id === b.id ? 'bg-blue-50' : ''}`}
-                    onClick={() => setSelectedBus(b)}
-                  >
-                    <td className="px-4 py-2">{b.busNumber}</td>
-                    <td className="px-4 py-2">{b.driverName}</td>
-                    <td className="px-4 py-2">{b.route}</td>
-                    <td className="px-4 py-2">{b.capacity ?? '-'}</td>
-                    <td className="px-4 py-2">{b.contact ?? '-'}</td>
-                    <td className="px-4 py-2">
-                      {b.qrCode ? (
+            {/* Buses Table */}
+            <div className="mt-8">
+              <h3 className="text-lg font-semibold mb-3">Registered Buses</h3>
+              <div className="overflow-x-auto">
+                <table className="min-w-full bg-white">
+                  <thead>
+                    <tr className="bg-gray-100 text-left">
+                      <th className="px-4 py-2">Bus Number</th>
+                      <th className="px-4 py-2">Driver</th>
+                      <th className="px-4 py-2">Route</th>
+                      <th className="px-4 py-2">Capacity</th>
+                      <th className="px-4 py-2">Contact</th>
+                      <th className="px-4 py-2">QR</th>
+                      <th className="px-4 py-2">Created At</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {buses.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan="7"
+                          className="px-4 py-6 text-center text-gray-500"
+                        >
+                          No buses registered yet.
+                        </td>
+                      </tr>
+                    )}
+                    {buses.map((b) => (
+                      <tr
+                        key={b.id}
+                        className={`border-t cursor-pointer ${selectedBus && selectedBus.id === b.id ? "bg-blue-50" : ""}`}
+                        onClick={() => setSelectedBus(b)}
+                      >
+                        <td className="px-4 py-2">{b.busNumber}</td>
+                        <td className="px-4 py-2">{b.driverName}</td>
+                        <td className="px-4 py-2">{b.routeNumber}</td>
+                        <td className="px-4 py-2">{b.capacity ?? "-"}</td>
+                        <td className="px-4 py-2">{b.contact ?? "-"}</td>
+                        <td className="px-4 py-2">
+                          {b.qrCode ? (
+                            <img
+                              src={b.qrCode}
+                              alt={`QR for ${b.busNumber}`}
+                              style={{
+                                width: 48,
+                                height: 48,
+                                objectFit: "cover",
+                                borderRadius: 6,
+                              }}
+                            />
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2">
+                          {b.createdAt
+                            ? new Date(b.createdAt).toLocaleString()
+                            : "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Selected Bus Details */}
+              {selectedBus && (
+                <div className="mt-6 p-4 border rounded-lg bg-gray-50">
+                  <h4 className="text-lg font-semibold mb-2">Bus Details</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-sm text-gray-500">Bus Number</div>
+                      <div className="font-medium">{selectedBus.busNumber}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Driver</div>
+                      <div className="font-medium">
+                        {selectedBus.driverName}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Route</div>
+                      <div className="font-medium">{selectedBus.route}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Capacity</div>
+                      <div className="font-medium">
+                        {selectedBus.capacity ?? "-"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Contact</div>
+                      <div className="font-medium">
+                        {selectedBus.contact ?? "-"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-gray-500">Created At</div>
+                      <div className="font-medium">
+                        {selectedBus.createdAt
+                          ? new Date(selectedBus.createdAt).toLocaleString()
+                          : "-"}
+                      </div>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <div className="text-sm text-gray-500">QR Code</div>
+                      {selectedBus.qrCode ? (
                         <img
-                          src={b.qrCode}
-                          alt={`QR for ${b.busNumber}`}
-                          style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 6 }}
-                          title="Click row to view full QR"
+                          src={selectedBus.qrCode}
+                          alt="Bus QR"
+                          style={{ width: 160, height: 160 }}
                         />
                       ) : (
-                        <span className="text-gray-400">-</span>
+                        <div className="text-gray-500">No QR available</div>
                       )}
-                    </td>
-                    <td className="px-4 py-2">{b.createdAt ? new Date(b.createdAt).toLocaleString() : '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Selected Bus Details */}
-          {selectedBus && (
-            <div className="mt-6 p-4 border rounded-lg bg-gray-50">
-              <h4 className="text-lg font-semibold mb-2">Bus Details</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <div className="text-sm text-gray-500">Bus Number</div>
-                  <div className="font-medium">{selectedBus.busNumber}</div>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <button
+                      onClick={() => setSelectedBus(null)}
+                      className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                    >
+                      Close
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-sm text-gray-500">Driver</div>
-                  <div className="font-medium">{selectedBus.driverName}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Route</div>
-                  <div className="font-medium">{selectedBus.route}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Capacity</div>
-                  <div className="font-medium">{selectedBus.capacity ?? '-'}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Contact</div>
-                  <div className="font-medium">{selectedBus.contact ?? '-'}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Created At</div>
-                  <div className="font-medium">{selectedBus.createdAt ? new Date(selectedBus.createdAt).toLocaleString() : '-'}</div>
-                </div>
-                {/* QR Code display */}
-                <div className="sm:col-span-2">
-                  <div className="text-sm text-gray-500">QR Code</div>
-                  {selectedBus.qrCode ? (
-                    <img src={selectedBus.qrCode} alt="Bus QR" style={{ width: 160, height: 160 }} />
-                  ) : (
-                    <div className="text-gray-500">No QR available</div>
-                  )}
-                </div>
-              </div>
-              <div className="mt-4">
-                <button onClick={() => setSelectedBus(null)} className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300">
-                  Close
-                </button>
-              </div>
+              )}
             </div>
-          )}
-        </div>
           </div>
         </div>
       </div>
