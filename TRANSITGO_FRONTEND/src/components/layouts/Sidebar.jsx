@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   MdDashboard,
   MdChevronLeft,
@@ -13,27 +13,19 @@ import { FaTicket } from "react-icons/fa6";
 import { TbReportAnalytics } from "react-icons/tb";
 import { FiLogOut } from "react-icons/fi";
 import logo from '../../assets/Logo.png';
-
-// Add this fallback at the top, before Sidebar definition
-const useAuth = () => ({
-  logout: async () => {
-    // Dummy logout function
-    // Replace with your actual logout logic
-    alert("Logged out!");
-  }
-});
+import { signOutUser } from "../../firebase/auth";
 
 const sidebarSections = [
   {
     header: null,
     items: [
-      { label: "Dashboard", icon: <MdDashboard size={18} />, to: "/" }
+      { label: "Dashboard", icon: <MdDashboard size={18} />, to: "/home" }
     ]
   },
   {
     header: "BUS REGISTRATION",
     items: [
-      { label: "Registration", icon: <MdOutlineAppRegistration size={16} />, to: "/bus_registration" }
+      { label: "Registration", icon: <MdOutlineAppRegistration size={16} />, to: "/home/bus_registration" }
     ]
   },
   {
@@ -69,9 +61,16 @@ const sidebarSections = [
 ];
 
 const Sidebar = ({ sidebarOpen, toggleSidebar, isMobile = false }) => {
-  const { logout } = useAuth();
+  const navigate = useNavigate();
   const location = useLocation();
   const [openSection, setOpenSection] = useState(null);
+
+  const handleLogout = async () => {
+    const result = await signOutUser();
+    if (result.success) {
+      navigate("/");
+    }
+  };
 
   const textTransition = {
     transition: "opacity 0.25s ease, transform 0.25s ease, width 0.25s ease",
@@ -231,7 +230,7 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, isMobile = false }) => {
           borderRadius: '0 0 24px 24px'
         }}>
           <button
-            onClick={async () => await logout()}
+            onClick={handleLogout}
             style={{
               display: 'flex',
               alignItems: 'center',

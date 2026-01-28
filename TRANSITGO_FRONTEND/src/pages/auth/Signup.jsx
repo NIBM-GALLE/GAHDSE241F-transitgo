@@ -53,8 +53,7 @@ const Signup = () => {
       );
 
       if (result.success) {
-        // Redirect to home or dashboard after successful signup
-        navigate("/");
+        navigate("/home");
       } else {
         setError(result.error || "Failed to create account");
       }
@@ -73,7 +72,7 @@ const Signup = () => {
       const result = await signInWithGoogle();
 
       if (result.success) {
-        navigate("/");
+        navigate("/home");
       } else {
         setError(result.error || "Failed to sign up with Google");
       }

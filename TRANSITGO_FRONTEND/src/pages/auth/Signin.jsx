@@ -37,8 +37,7 @@ const Signin = () => {
       const result = await signInWithEmail(formData.email, formData.password);
 
       if (result.success) {
-        // Redirect to home or dashboard after successful signin
-        navigate("/");
+        navigate("/home");
       } else {
         // Handle specific Firebase errors
         let errorMessage = result.error || "Failed to sign in";
@@ -66,7 +65,7 @@ const Signin = () => {
       const result = await signInWithGoogle();
 
       if (result.success) {
-        navigate("/");
+        navigate("/home");
       } else {
         setError(result.error || "Failed to sign in with Google");
       }
