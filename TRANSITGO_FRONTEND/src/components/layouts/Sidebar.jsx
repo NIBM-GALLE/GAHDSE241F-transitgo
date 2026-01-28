@@ -31,13 +31,8 @@ const sidebarSections = [
   {
     header: "ROUTE MANAGEMENT",
     items: [
-      { label: "Route", icon: <FaRoute size={16} />, to: "/customer" }
-    ]
-  },
-  {
-    header: "BUS SCHEDULING",
-    items: [
-      { label: "Schedule", icon: <RiCalendarScheduleFill size={16} />, to: "/products" }
+      { label: "Route", icon: <FaRoute size={16} />, to: "/home/bus_routes" },
+      { label: "Route Registration", icon: <RiCalendarScheduleFill size={16} />, to: "/home/route_registration" }
     ]
   },
   {

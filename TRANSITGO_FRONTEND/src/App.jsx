@@ -4,6 +4,8 @@ import BusRegistration from "./pages/registration/BusRegistration";
 import Home from "./pages/Dashboard";
 import Signup from "./pages/auth/Signup";
 import Signin from "./pages/auth/Signin";
+import BusRoute from "./pages/routes/busRoute";
+import RouteRegistration from "./pages/routes/RouteRegistration";
 
 function App() {
   return (
@@ -18,6 +20,8 @@ function App() {
         <Route path="/home" element={<MainLayout />}>
           <Route index element={<Home />} />
           <Route path="bus_registration" element={<BusRegistration />} />
+          <Route path="bus_routes" element={<BusRoute />} />
+          <Route path="route_registration" element={<RouteRegistration />} />
         </Route>
 
       </Routes>
