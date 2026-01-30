@@ -6,6 +6,7 @@ import Signup from "./pages/auth/Signup";
 import Signin from "./pages/auth/Signin";
 import BusRoute from "./pages/routes/busRoute";
 import RouteRegistration from "./pages/routes/RouteRegistration";
+import SalesPayments from "./pages/SalesPayments/SalesPayments";
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
           <Route path="bus_registration" element={<BusRegistration />} />
           <Route path="bus_routes" element={<BusRoute />} />
           <Route path="route_registration" element={<RouteRegistration />} />
+          <Route path="accounts" element={<SalesPayments />} />
         </Route>
 
       </Routes>

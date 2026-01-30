@@ -44,7 +44,7 @@ const sidebarSections = [
   {
     header: "TICKET SECTION",
     items: [
-      { label: "Sales & Payments", icon: <FaTicket size={16} />, to: "/accounts" }
+      { label: "Sales & Payments", icon: <FaTicket size={16} />, to: "/home/accounts" }
     ]
   },
   {
