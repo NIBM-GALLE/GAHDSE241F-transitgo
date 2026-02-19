@@ -28,7 +28,7 @@ const BusRegistration = () => {
 
   const labelClass = "block text-sm font-medium text-gray-700";
   const inputClass =
-    "mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100";
+    "mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100";
 
   // Fetch available routes from Firestore
   const fetchAvailableRoutes = async () => {
@@ -78,6 +78,7 @@ const BusRegistration = () => {
           busNumber: d.busNumber || null,
           driverName: d.driverName || null,
           route: d.route || null,
+          routeNumber: d.routeNumber || d.route || null,
           capacity: d.capacity ?? null,
           contact: d.contact ?? null,
           createdAt,
@@ -139,18 +140,23 @@ const BusRegistration = () => {
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-gray-100 flex items-start justify-center p-4">
       <div className="w-full max-w-6xl">
         <div className="rounded-3xl border border-gray-200 bg-white shadow-lg">
-          <div className="rounded-3xl bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5">
+          <div
+            className="rounded-t-3xl px-6 py-5"
+            style={{
+              background: "linear-gradient(135deg, #27ae60 0%, #16c98d 100%)",
+            }}
+          >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-2xl font-bold text-white">
                   Bus Registration
                 </h2>
-                <p className="mt-1 text-sm text-blue-100">
+                <p className="mt-1 text-sm text-white/90">
                   Register a new bus and generate a QR code for quick
                   identification.
                 </p>
               </div>
-              <div className="rounded-2xl bg-white/10 px-4 py-2 text-sm text-white/90">
+              <div className="rounded-2xl bg-white/20 px-4 py-2 text-sm text-white font-medium">
                 Fields marked{" "}
                 <span className="font-semibold text-white">*</span> are required
               </div>
@@ -160,7 +166,7 @@ const BusRegistration = () => {
           <div className="p-6">
             {/* Route List Section */}
             {!routeLoading && availableRoutes.length > 0 && (
-              <div className="mb-8 rounded-2xl border border-gray-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-6 shadow-sm">
+              <div className="mb-8 rounded-2xl border border-gray-200 bg-gradient-to-br from-emerald-50 to-green-50 p-6 shadow-sm">
                 <h3 className="mb-4 text-lg font-semibold text-gray-900">
                   📋 Available Routes
                 </h3>
@@ -180,21 +186,21 @@ const BusRegistration = () => {
                         borderRadius: "8px",
                         border:
                           form.route === route.displayText
-                            ? "2px solid #3b82f6"
+                            ? "2px solid #27ae60"
                             : "1px solid #e5e7eb",
                         backgroundColor:
-                          form.route === route.displayText ? "#dbeafe" : "#fff",
+                          form.route === route.displayText ? "#d1fae5" : "#fff",
                         transition: "all 0.2s ease",
                         boxShadow:
                           form.route === route.displayText
-                            ? "0 0 0 3px rgba(59, 130, 246, 0.1)"
+                            ? "0 0 0 3px rgba(39, 174, 96, 0.1)"
                             : "none",
                       }}
                       className="hover:shadow-md"
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <p className="font-bold text-blue-600">
+                          <p className="font-bold text-emerald-600">
                             {route.routeNumber}
                           </p>
                           <p className="mt-1 text-sm text-gray-700">
@@ -315,7 +321,7 @@ const BusRegistration = () => {
                         );
                         if (!r) return null;
                         return (
-                          <div className="mt-2 rounded-lg bg-blue-50 p-3 text-sm">
+                          <div className="mt-2 rounded-lg bg-emerald-50 p-3 text-sm">
                             <p>
                               <b>Route No:</b> {r.routeNumber}
                             </p>
@@ -406,7 +412,7 @@ const BusRegistration = () => {
                       ${
                         status?.type === "loading"
                           ? "bg-gray-400 cursor-not-allowed"
-                          : "bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200"
+                          : "bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200"
                       }
                     `}
                   >
@@ -446,12 +452,12 @@ const BusRegistration = () => {
                     {buses.map((b) => (
                       <tr
                         key={b.id}
-                        className={`border-t cursor-pointer ${selectedBus && selectedBus.id === b.id ? "bg-blue-50" : ""}`}
+                        className={`border-t cursor-pointer ${selectedBus && selectedBus.id === b.id ? "bg-emerald-50" : ""}`}
                         onClick={() => setSelectedBus(b)}
                       >
                         <td className="px-4 py-2">{b.busNumber}</td>
                         <td className="px-4 py-2">{b.driverName}</td>
-                        <td className="px-4 py-2">{b.routeNumber}</td>
+                        <td className="px-4 py-2">{b.routeNumber ?? b.route ?? "-"}</td>
                         <td className="px-4 py-2">{b.capacity ?? "-"}</td>
                         <td className="px-4 py-2">{b.contact ?? "-"}</td>
                         <td className="px-4 py-2">
@@ -498,7 +504,7 @@ const BusRegistration = () => {
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">Route</div>
-                      <div className="font-medium">{selectedBus.route}</div>
+                      <div className="font-medium">{selectedBus.routeNumber ?? selectedBus.route ?? "-"}</div>
                     </div>
                     <div>
                       <div className="text-sm text-gray-500">Capacity</div>
