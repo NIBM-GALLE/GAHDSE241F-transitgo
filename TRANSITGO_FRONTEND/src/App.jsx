@@ -7,6 +7,8 @@ import Signin from "./pages/auth/Signin";
 import BusRoute from "./pages/routes/busRoute";
 import RouteRegistration from "./pages/routes/RouteRegistration";
 import SalesPayments from "./pages/SalesPayments/SalesPayments";
+import PassengerRegistration from "./pages/passengers/PassengerRegistration";
+import PassengerList from "./pages/passengers/PassengerList";
 
 function App() {
   return (
@@ -24,6 +26,8 @@ function App() {
           <Route path="bus_routes" element={<BusRoute />} />
           <Route path="route_registration" element={<RouteRegistration />} />
           <Route path="accounts" element={<SalesPayments />} />
+          <Route path="passenger_registration" element={<PassengerRegistration />} />
+          <Route path="passengers" element={<PassengerList />} />
         </Route>
 
       </Routes>

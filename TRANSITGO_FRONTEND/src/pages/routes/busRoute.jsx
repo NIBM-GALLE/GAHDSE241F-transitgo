@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
-import { useNavigate } from "react-router-dom";
+import { collection, getDocs, query, orderBy, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 
 const BusRoute = () => {
@@ -11,7 +10,13 @@ const BusRoute = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedRoute, setSelectedRoute] = useState(null);
-  const navigate = useNavigate();
+  const [selectedBus, setSelectedBus] = useState(null);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState({
+    date: "",
+    time: ""
+  });
+  const [scheduleStatus, setScheduleStatus] = useState(null);
   
 
   useEffect(() => {
@@ -45,6 +50,7 @@ const BusRoute = () => {
           busNumber: data.busNumber || "",
           driverName: data.driverName || "",
           route: data.route || "",
+          routeNumber: data.routeNumber || data.route || "",
           capacity: data.capacity || 0,
           contact: data.contact || "",
           qrCode: data.qrCode || null
@@ -60,339 +66,464 @@ const BusRoute = () => {
     }
   };
 
+  // Get unique destinations from routes
+  const uniqueDestinations = [...new Set(routes.map(route => route.destination).filter(Boolean))].sort();
+
   const filteredRoutes = routes.filter(route =>
     route.start.toLowerCase().includes(start.toLowerCase()) &&
-    route.destination.toLowerCase().includes(destination.toLowerCase())
+    (!destination || route.destination === destination)
   );
 
-  // Get buses for selected route
-  const busesForRoute = selectedRoute
-    ? buses.filter(bus => bus.route === selectedRoute.routeNumber)
+  // Get buses for selected destination
+  const busesForDestination = destination
+    ? buses.filter(bus => {
+        const routeNumbers = routes
+          .filter(route => route.destination === destination)
+          .map(route => route.routeNumber);
+        return routeNumbers.includes(bus.routeNumber) || routeNumbers.includes(bus.route);
+      })
     : [];
 
-  const handleScheduleRoute = (route) => {
-    navigate("/home/bus_schedule", { state: { selectedRoute: route } });
+  // Get buses for selected route (for backward compatibility)
+  const busesForRoute = selectedRoute
+    ? buses.filter(bus => bus.routeNumber === selectedRoute.routeNumber || bus.route === selectedRoute.routeNumber)
+    : [];
+
+  const handleScheduleBus = (bus) => {
+    setSelectedBus(bus);
+    setShowScheduleModal(true);
+    setScheduleForm({ date: "", time: "" });
+    setScheduleStatus(null);
+  };
+
+  const handleCloseModal = () => {
+    setShowScheduleModal(false);
+    setSelectedBus(null);
+    setScheduleForm({ date: "", time: "" });
+    setScheduleStatus(null);
+  };
+
+  const handleScheduleSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!scheduleForm.date || !scheduleForm.time) {
+      setScheduleStatus({ type: "error", msg: "Please fill in both date and time" });
+      return;
+    }
+
+    try {
+      setScheduleStatus({ type: "loading" });
+
+      // Find the route for this bus
+      const busRoute = routes.find(r => 
+        r.routeNumber === selectedBus.routeNumber || r.routeNumber === selectedBus.route
+      );
+
+      await addDoc(collection(db, "schedules"), {
+        busId: selectedBus.id,
+        busNumber: selectedBus.busNumber,
+        driverName: selectedBus.driverName,
+        routeId: busRoute?.id || null,
+        routeNumber: busRoute?.routeNumber || selectedBus.routeNumber || selectedBus.route,
+        destination: destination || busRoute?.destination || "",
+        date: scheduleForm.date,
+        time: scheduleForm.time,
+        status: "Scheduled",
+        createdAt: serverTimestamp()
+      });
+
+      setScheduleStatus({ type: "success", msg: "Schedule saved successfully! 🎉" });
+      
+      // Close modal after 1.5 seconds
+      setTimeout(() => {
+        handleCloseModal();
+      }, 1500);
+    } catch (err) {
+      console.error("Error saving schedule:", err);
+      setScheduleStatus({ type: "error", msg: "Failed to save schedule" });
+    }
   };
 
   return (
-    <div style={styles.container}>
-      <h2 style={styles.title}>🚌 Bus Route Management</h2>
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-gray-100 p-4">
+      <div className="w-full max-w-6xl mx-auto">
+        <div className="rounded-3xl border border-gray-200 bg-white shadow-lg overflow-hidden">
+          {/* Header */}
+          <div
+            className="rounded-t-3xl px-6 py-5"
+            style={{
+              background: "linear-gradient(135deg, #27ae60 0%, #16c98d 100%)",
+            }}
+          >
+            <h2 className="text-2xl font-bold text-white">
+              🚌 Bus Route Management
+            </h2>
+            <p className="mt-1 text-sm text-white/90">
+              Search routes and manage bus schedules by destination.
+            </p>
+          </div>
 
-      {/* Route Search Section */}
-      <div style={styles.section}>
-        <h3 style={styles.sectionTitle}>Search Routes</h3>
-        <div style={styles.filters}>
-          <input
-            type="text"
-            placeholder="Start Location"
-            value={start}
-            onChange={(e) => setStart(e.target.value)}
-            style={styles.input}
-          />
-          <input
-            type="text"
-            placeholder="Destination"
-            value={destination}
-            onChange={(e) => setDestination(e.target.value)}
-            style={styles.input}
-          />
+          <div className="p-6">
+            {/* Route Search Section */}
+            <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Search Routes</h3>
+              <div className="flex flex-wrap gap-3">
+                <input
+                  type="text"
+                  placeholder="Start Location"
+                  value={start}
+                  onChange={(e) => setStart(e.target.value)}
+                  className="flex-1 min-w-[200px] rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm outline-none transition placeholder:text-gray-400 focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                />
+                <select
+                  value={destination}
+                  onChange={(e) => {
+                    setDestination(e.target.value);
+                    setSelectedRoute(null);
+                  }}
+                  className="flex-1 min-w-[200px] rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                >
+                  <option value="">Select Destination</option>
+                  {uniqueDestinations.map(dest => (
+                    <option key={dest} value={dest}>{dest}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {loading && (
+              <div className="text-center py-12 text-gray-500 bg-white rounded-xl border border-gray-200">
+                ⏳ Loading routes...
+              </div>
+            )}
+            
+            {error && (
+              <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800">
+                ❌ {error}
+              </div>
+            )}
+
+            {/* Buses Table for Selected Destination */}
+            {!loading && destination && (
+              <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Buses for Destination: {destination}
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {busesForDestination.length} bus{busesForDestination.length !== 1 ? 'es' : ''} available
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setDestination("");
+                      setSelectedRoute(null);
+                    }}
+                    className="px-4 py-2 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600 transition"
+                  >
+                    ✕ Clear Selection
+                  </button>
+                </div>
+
+                {busesForDestination.length === 0 ? (
+                  <div className="text-center py-12 px-4 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                    <p className="text-gray-500 mb-2">📭 No buses registered for this destination.</p>
+                    <p className="text-sm text-gray-400">
+                      Go to Bus Registration to assign buses to routes with this destination.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-gray-200">
+                    <table className="min-w-full bg-white">
+                      <thead>
+                        <tr className="bg-emerald-600 text-white">
+                          <th className="px-4 py-3 text-left font-semibold">Bus Number</th>
+                          <th className="px-4 py-3 text-left font-semibold">Driver</th>
+                          <th className="px-4 py-3 text-left font-semibold">Route</th>
+                          <th className="px-4 py-3 text-left font-semibold">Capacity</th>
+                          <th className="px-4 py-3 text-left font-semibold">Contact</th>
+                          <th className="px-4 py-3 text-left font-semibold">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {busesForDestination.map((bus, idx) => {
+                          const busRoute = routes.find(r => 
+                            r.routeNumber === bus.routeNumber || r.routeNumber === bus.route
+                          );
+                          return (
+                            <tr
+                              key={bus.id}
+                              className={`border-t border-gray-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                            >
+                              <td className="px-4 py-3">
+                                <span className="font-bold text-emerald-600">
+                                  {bus.busNumber}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">{bus.driverName}</td>
+                              <td className="px-4 py-3">
+                                {busRoute ? (
+                                  <span>
+                                    {busRoute.routeNumber} - {busRoute.start} → {busRoute.destination}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400">{bus.routeNumber || bus.route || '-'}</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700">
+                                  {bus.capacity} seats
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">{bus.contact || '-'}</td>
+                              <td className="px-4 py-3">
+                                <button
+                                  onClick={() => handleScheduleBus(bus)}
+                                  className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition shadow-sm"
+                                >
+                                  Schedule
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Routes Table (shown when no destination is selected) */}
+            {!loading && !destination && filteredRoutes.length > 0 && (
+              <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Available Routes</h3>
+                <div className="overflow-x-auto rounded-xl border border-gray-200">
+                  <table className="min-w-full bg-white">
+                    <thead>
+                      <tr className="bg-emerald-600 text-white">
+                        <th className="px-4 py-3 text-left font-semibold">Route No</th>
+                        <th className="px-4 py-3 text-left font-semibold">From</th>
+                        <th className="px-4 py-3 text-left font-semibold">To</th>
+                        <th className="px-4 py-3 text-left font-semibold">Via</th>
+                        <th className="px-4 py-3 text-left font-semibold">Fare</th>
+                        <th className="px-4 py-3 text-left font-semibold">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredRoutes.map((route, idx) => (
+                        <tr
+                          key={route.id}
+                          className={`border-t border-gray-100 cursor-pointer transition ${
+                            selectedRoute?.id === route.id
+                              ? 'bg-emerald-50'
+                              : idx % 2 === 0
+                              ? 'bg-white hover:bg-gray-50'
+                              : 'bg-gray-50/50 hover:bg-gray-100'
+                          }`}
+                          onClick={() => setSelectedRoute(route)}
+                        >
+                          <td className="px-4 py-3 font-semibold text-emerald-600">{route.routeNumber}</td>
+                          <td className="px-4 py-3">{route.start}</td>
+                          <td className="px-4 py-3">{route.destination}</td>
+                          <td className="px-4 py-3">{route.via || '-'}</td>
+                          <td className="px-4 py-3">Rs. {route.fare}</td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ${
+                                route.status === 'Active'
+                                  ? 'bg-green-100 text-green-700'
+                                  : 'bg-red-100 text-red-700'
+                              }`}
+                            >
+                              {route.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {!loading && !destination && filteredRoutes.length === 0 && !error && (
+              <div className="text-center py-12 text-gray-500 bg-white rounded-xl border border-gray-200">
+                📭 Select a destination to view buses
+              </div>
+            )}
+
+            {/* Buses for Selected Route */}
+            {selectedRoute && (
+              <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Buses on Route {selectedRoute.routeNumber}
+                    </h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {selectedRoute.start} → {selectedRoute.destination}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedRoute(null)}
+                    className="px-4 py-2 rounded-xl bg-red-500 text-white font-semibold hover:bg-red-600 transition"
+                  >
+                    ✕ Clear Selection
+                  </button>
+                </div>
+
+                {busesForRoute.length === 0 ? (
+                  <div className="text-center py-12 px-4 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                    <p className="text-gray-500 mb-2">📭 No buses assigned to this route yet.</p>
+                    <p className="text-sm text-gray-400">
+                      Go to Bus Registration to assign buses to this route.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-gray-200">
+                    <table className="min-w-full bg-white">
+                      <thead>
+                        <tr className="bg-emerald-600 text-white">
+                          <th className="px-4 py-3 text-left font-semibold">Bus Number</th>
+                          <th className="px-4 py-3 text-left font-semibold">Driver</th>
+                          <th className="px-4 py-3 text-left font-semibold">Capacity</th>
+                          <th className="px-4 py-3 text-left font-semibold">Contact</th>
+                          <th className="px-4 py-3 text-left font-semibold">QR Code</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {busesForRoute.map((bus, idx) => (
+                          <tr
+                            key={bus.id}
+                            className={`border-t border-gray-100 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}`}
+                          >
+                            <td className="px-4 py-3">
+                              <span className="font-bold text-emerald-600">
+                                {bus.busNumber}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">{bus.driverName}</td>
+                            <td className="px-4 py-3">
+                              <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-700">
+                                {bus.capacity} seats
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">{bus.contact || '-'}</td>
+                            <td className="px-4 py-3">
+                              {bus.qrCode ? (
+                                <img
+                                  src={bus.qrCode}
+                                  alt={`QR for ${bus.busNumber}`}
+                                  className="w-12 h-12 object-cover rounded-lg border-2 border-emerald-600 cursor-pointer"
+                                  title="Click to view full QR code"
+                                />
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      {loading && <p style={styles.message}>⏳ Loading routes...</p>}
-      {error && <p style={styles.error}>❌ {error}</p>}
-      {!loading && filteredRoutes.length === 0 && !error && (
-        <p style={styles.message}>📭 No routes found</p>
-      )}
-
-      {/* Routes Table */}
-      {!loading && filteredRoutes.length > 0 && (
-        <div style={styles.section}>
-          <h3 style={styles.sectionTitle}>Available Routes</h3>
-          <div style={styles.tableWrapper}>
-            <table style={styles.table}>
-              <thead>
-                <tr style={styles.headerRow}>
-                  <th style={styles.th}>Route No</th>
-                  <th style={styles.th}>From</th>
-                  <th style={styles.th}>To</th>
-                  <th style={styles.th}>Via</th>
-                  <th style={styles.th}>Fare</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRoutes.map((route, idx) => (
-                  <tr 
-                    key={route.id} 
-                    style={{
-                      ...styles.row,
-                      backgroundColor: selectedRoute?.id === route.id ? '#e8f5e9' : (idx % 2 === 0 ? '#f9f9f9' : '#fff')
-                    }}
-                    onClick={() => setSelectedRoute(route)}
-                  >
-                    <td style={styles.td}>{route.routeNumber}</td>
-                    <td style={styles.td}>{route.start}</td>
-                    <td style={styles.td}>{route.destination}</td>
-                    <td style={styles.td}>{route.via}</td>
-                    <td style={styles.td}>Rs. {route.fare}</td>
-                    <td style={styles.td}>
-                      <span style={{
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        backgroundColor: route.status === 'Active' ? '#d4edda' : '#f8d7da',
-                        color: route.status === 'Active' ? '#155724' : '#721c24',
-                        fontSize: '12px',
-                        fontWeight: 'bold'
-                      }}>
-                        {route.status}
-                      </span>
-                    </td>
-                    <td style={styles.td}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleScheduleRoute(route);
-                        }}
-                        style={styles.actionBtn}
-                        onMouseOver={(e) => e.target.style.backgroundColor = '#1e8449'}
-                        onMouseOut={(e) => e.target.style.backgroundColor = '#27ae60'}
-                      >
-                        Schedule
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Buses for Selected Route */}
-      {selectedRoute && (
-        <div style={styles.section}>
-          <div style={styles.routeHeader}>
-            <div>
-              <h3 style={styles.sectionTitle}>
-                Buses on Route {selectedRoute.routeNumber}
-              </h3>
-              <p style={styles.routeSubtitle}>
-                {selectedRoute.start} → {selectedRoute.destination}
-              </p>
-            </div>
-            <button
-              onClick={() => setSelectedRoute(null)}
-              style={styles.clearBtn}
+      {/* Schedule Modal */}
+      {showScheduleModal && selectedBus && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={handleCloseModal}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="px-6 py-4 flex items-center justify-between rounded-t-2xl"
+              style={{
+                background: "linear-gradient(135deg, #27ae60 0%, #16c98d 100%)",
+              }}
             >
-              ✕ Clear Selection
-            </button>
-          </div>
+              <h3 className="text-lg font-bold text-white">Schedule Bus</h3>
+              <button
+                onClick={handleCloseModal}
+                className="p-1 rounded-lg text-white hover:bg-white/20 transition"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <div className="mb-5 rounded-lg bg-gray-50 p-4">
+                <p className="text-sm text-gray-700 mb-2"><strong>Bus Number:</strong> {selectedBus.busNumber}</p>
+                <p className="text-sm text-gray-700 mb-2"><strong>Driver:</strong> {selectedBus.driverName}</p>
+                <p className="text-sm text-gray-700"><strong>Destination:</strong> {destination}</p>
+              </div>
 
-          {busesForRoute.length === 0 ? (
-            <div style={styles.noDataMessage}>
-              <p>📭 No buses assigned to this route yet.</p>
-              <p style={{ fontSize: '14px', color: '#999' }}>
-                Go to Bus Registration to assign buses to this route.
-              </p>
+              <form onSubmit={handleScheduleSubmit}>
+                <div className="mb-5">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Date *</label>
+                  <input
+                    type="date"
+                    value={scheduleForm.date}
+                    onChange={(e) => setScheduleForm({ ...scheduleForm, date: e.target.value })}
+                    min={new Date().toISOString().split('T')[0]}
+                    required
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                  />
+                </div>
+
+                <div className="mb-5">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Time *</label>
+                  <input
+                    type="time"
+                    value={scheduleForm.time}
+                    onChange={(e) => setScheduleForm({ ...scheduleForm, time: e.target.value })}
+                    required
+                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                  />
+                </div>
+
+                {scheduleStatus && (
+                  <div
+                    className={`mb-5 rounded-xl px-4 py-3 text-sm font-medium ${
+                      scheduleStatus.type === 'success'
+                        ? 'border border-green-200 bg-green-50 text-green-800'
+                        : 'border border-red-200 bg-red-50 text-red-800'
+                    }`}
+                  >
+                    {scheduleStatus.msg}
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={handleCloseModal}
+                    className="px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-700 font-semibold hover:bg-gray-50 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={scheduleStatus?.type === 'loading'}
+                    className={`px-4 py-2 rounded-xl font-semibold text-white transition ${
+                      scheduleStatus?.type === 'loading'
+                        ? 'bg-gray-400 cursor-not-allowed'
+                        : 'bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200'
+                    }`}
+                  >
+                    {scheduleStatus?.type === 'loading' ? 'Saving...' : 'Save Schedule'}
+                  </button>
+                </div>
+              </form>
             </div>
-          ) : (
-            <div style={styles.tableWrapper}>
-              <table style={styles.table}>
-                <thead>
-                  <tr style={styles.headerRow}>
-                    <th style={styles.th}>Bus Number</th>
-                    <th style={styles.th}>Driver</th>
-                    <th style={styles.th}>Capacity</th>
-                    <th style={styles.th}>Contact</th>
-                    <th style={styles.th}>QR Code</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {busesForRoute.map((bus, idx) => (
-                    <tr key={bus.id} style={{
-                      ...styles.row,
-                      backgroundColor: idx % 2 === 0 ? '#f9f9f9' : '#fff'
-                    }}>
-                      <td style={styles.td}>
-                        <span style={{ fontWeight: 'bold', color: '#27ae60' }}>
-                          {bus.busNumber}
-                        </span>
-                      </td>
-                      <td style={styles.td}>{bus.driverName}</td>
-                      <td style={styles.td}>
-                        <span style={{ 
-                          backgroundColor: '#e3f2fd',
-                          padding: '4px 8px',
-                          borderRadius: '4px',
-                          fontSize: '12px',
-                          fontWeight: 'bold'
-                        }}>
-                          {bus.capacity} seats
-                        </span>
-                      </td>
-                      <td style={styles.td}>{bus.contact || '-'}</td>
-                      <td style={styles.td}>
-                        {bus.qrCode ? (
-                          <img
-                            src={bus.qrCode}
-                            alt={`QR for ${bus.busNumber}`}
-                            style={{
-                              width: 50,
-                              height: 50,
-                              objectFit: 'cover',
-                              borderRadius: 6,
-                              cursor: 'pointer',
-                              border: '2px solid #27ae60'
-                            }}
-                            title="Click to view full QR code"
-                          />
-                        ) : (
-                          <span style={{ color: '#999' }}>-</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          </div>
         </div>
       )}
     </div>
   );
-};
-
-const styles = {
-  container: {
-    padding: '20px',
-    maxWidth: '1400px',
-    margin: '0 auto',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '8px'
-  },
-  title: {
-    fontSize: '28px',
-    fontWeight: 'bold',
-    marginBottom: '30px',
-    color: '#27ae60',
-  },
-  section: {
-    marginBottom: '30px',
-    backgroundColor: '#fff',
-    padding: '20px',
-    borderRadius: '8px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-  },
-  sectionTitle: {
-    fontSize: '18px',
-    fontWeight: 'bold',
-    marginBottom: '15px',
-    color: '#333',
-  },
-  routeSubtitle: {
-    fontSize: '14px',
-    color: '#666',
-    marginTop: '4px'
-  },
-  routeHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '15px'
-  },
-  filters: {
-    display: 'flex',
-    gap: '10px',
-    flexWrap: 'wrap'
-  },
-  input: {
-    padding: '12px',
-    borderRadius: '8px',
-    border: '1px solid #ddd',
-    fontSize: '14px',
-    flex: '1 1 200px',
-    minWidth: '200px'
-  },
-  tableWrapper: {
-    overflowX: 'auto',
-    borderRadius: '8px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    backgroundColor: '#fff'
-  },
-  headerRow: {
-    backgroundColor: '#27ae60',
-    color: '#fff'
-  },
-  th: {
-    padding: '12px 16px',
-    textAlign: 'left',
-    fontWeight: 'bold',
-    borderBottom: '2px solid #27ae60'
-  },
-  td: {
-    padding: '12px 16px',
-    borderBottom: '1px solid #eee'
-  },
-  row: {
-    transition: 'background-color 0.2s ease',
-    cursor: 'pointer'
-  },
-  message: {
-    textAlign: 'center',
-    padding: '40px 20px',
-    color: '#666',
-    fontSize: '16px',
-    backgroundColor: '#fff',
-    borderRadius: '8px',
-    marginBottom: '20px'
-  },
-  noDataMessage: {
-    textAlign: 'center',
-    padding: '40px 20px',
-    color: '#999',
-    fontSize: '16px',
-    backgroundColor: '#f5f5f5',
-    borderRadius: '8px',
-    border: '2px dashed #ddd'
-  },
-  error: {
-    textAlign: 'center',
-    padding: '20px',
-    color: '#c0392b',
-    fontSize: '16px',
-    backgroundColor: '#fadbd8',
-    borderRadius: '8px',
-    marginBottom: '20px'
-  },
-  actionBtn: {
-    padding: '8px 16px',
-    backgroundColor: '#27ae60',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '13px',
-    fontWeight: 'bold',
-    transition: 'all 0.3s ease',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-  },
-  clearBtn: {
-    padding: '10px 16px',
-    backgroundColor: '#e74c3c',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: 'bold',
-    transition: 'all 0.3s ease'
-  }
 };
 
 export default BusRoute;

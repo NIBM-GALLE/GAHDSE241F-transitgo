@@ -38,7 +38,8 @@ const sidebarSections = [
   {
     header: "PASSENGER SECTION",
     items: [
-      { label: "Passenger", icon: <FaUser size={16} />, to: "/pawning" }
+      { label: "Passenger Registration", icon: <MdOutlineAppRegistration size={16} />, to: "/home/passenger_registration" },
+      { label: "Passenger List", icon: <FaUser size={16} />, to: "/home/passengers" }
     ]
   },
   {
