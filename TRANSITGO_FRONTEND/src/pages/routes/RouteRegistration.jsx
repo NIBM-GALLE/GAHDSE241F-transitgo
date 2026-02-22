@@ -6,7 +6,10 @@ import {
   getDocs,
   serverTimestamp,
   orderBy,
-  query
+  query,
+  updateDoc,
+  deleteDoc,
+  doc
 } from "firebase/firestore";
 
 const RouteRegistration = () => {
@@ -20,6 +23,8 @@ const RouteRegistration = () => {
 
   const [routes, setRoutes] = useState([]);
   const [status, setStatus] = useState(null);
+  const [editingRoute, setEditingRoute] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   const labelClass = "block text-sm font-medium text-gray-700";
   const inputClass =
@@ -46,7 +51,7 @@ const RouteRegistration = () => {
     );
   };
 
-  // 🔹 Save route
+  // 🔹 Save or Update route
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -58,17 +63,33 @@ const RouteRegistration = () => {
     try {
       setStatus({ type: "loading" });
 
-      await addDoc(collection(db, "routes"), {
-        routeNumber: form.routeNumber,
-        start: form.start,
-        destination: form.destination,
-        via: form.via || "",
-        fare: Number(form.fare) || 0,
-        status: "Active",
-        createdAt: serverTimestamp()
-      });
+      if (editingRoute) {
+        // Update existing route
+        await updateDoc(doc(db, "routes", editingRoute.id), {
+          routeNumber: form.routeNumber,
+          start: form.start,
+          destination: form.destination,
+          via: form.via || "",
+          fare: Number(form.fare) || 0,
+        });
 
-      setStatus({ type: "success", msg: "Route saved successfully 🚏" });
+        setStatus({ type: "success", msg: "Route updated successfully 🚏" });
+        setEditingRoute(null);
+      } else {
+        // Create new route
+        await addDoc(collection(db, "routes"), {
+          routeNumber: form.routeNumber,
+          start: form.start,
+          destination: form.destination,
+          via: form.via || "",
+          fare: Number(form.fare) || 0,
+          status: "Active",
+          createdAt: serverTimestamp()
+        });
+
+        setStatus({ type: "success", msg: "Route saved successfully 🚏" });
+      }
+
       setForm({
         routeNumber: "",
         start: "",
@@ -80,7 +101,50 @@ const RouteRegistration = () => {
       fetchRoutes();
     } catch (err) {
       console.error(err);
-      setStatus({ type: "error", msg: "Failed to save route" });
+      setStatus({ type: "error", msg: editingRoute ? "Failed to update route" : "Failed to save route" });
+    }
+  };
+
+  // 🔹 Handle Edit
+  const handleEdit = (route) => {
+    setEditingRoute(route);
+    setForm({
+      routeNumber: route.routeNumber || "",
+      start: route.start || "",
+      destination: route.destination || "",
+      via: route.via || "",
+      fare: route.fare || ""
+    });
+    setStatus(null);
+    // Scroll to form
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // 🔹 Handle Cancel Edit
+  const handleCancelEdit = () => {
+    setEditingRoute(null);
+    setForm({
+      routeNumber: "",
+      start: "",
+      destination: "",
+      via: "",
+      fare: ""
+    });
+    setStatus(null);
+  };
+
+  // 🔹 Handle Delete
+  const handleDelete = async (routeId) => {
+    try {
+      setStatus({ type: "loading" });
+      await deleteDoc(doc(db, "routes", routeId));
+      setStatus({ type: "success", msg: "Route deleted successfully 🗑️" });
+      setDeleteConfirm(null);
+      fetchRoutes();
+    } catch (err) {
+      console.error(err);
+      setStatus({ type: "error", msg: "Failed to delete route" });
+      setDeleteConfirm(null);
     }
   };
 
@@ -96,9 +160,11 @@ const RouteRegistration = () => {
             background: "linear-gradient(135deg, #27ae60 0%, #16c98d 100%)",
           }}
         >
-          <h2 className="text-2xl font-bold text-white">Route Registration</h2>
+          <h2 className="text-2xl font-bold text-white">
+            {editingRoute ? "Edit Route" : "Route Registration"}
+          </h2>
           <p className="text-white/90 text-sm mt-1">
-            Register official bus routes
+            {editingRoute ? "Update route details" : "Register official bus routes"}
           </p>
         </div>
 
@@ -171,8 +237,18 @@ const RouteRegistration = () => {
               />
             </div>
 
-              <div className="md:col-span-2 flex justify-end">
+              <div className="md:col-span-2 flex justify-end gap-3">
+                {editingRoute && (
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="px-5 py-2 rounded-xl font-semibold text-gray-700 bg-gray-200 hover:bg-gray-300 transition"
+                  >
+                    Cancel
+                  </button>
+                )}
                 <button
+                  type="submit"
                   disabled={status?.type === "loading"}
                   className={`px-5 py-2 rounded-xl font-semibold text-white transition ${
                     status?.type === "loading"
@@ -180,7 +256,9 @@ const RouteRegistration = () => {
                       : "bg-emerald-600 hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200"
                   }`}
                 >
-                  {status?.type === "loading" ? "Saving..." : "Save Route"}
+                  {status?.type === "loading" 
+                    ? (editingRoute ? "Updating..." : "Saving...") 
+                    : (editingRoute ? "Update Route" : "Save Route")}
                 </button>
               </div>
             </form>
@@ -210,6 +288,7 @@ const RouteRegistration = () => {
                     <th className="px-4 py-3 text-left font-semibold">Via</th>
                     <th className="px-4 py-3 text-left font-semibold">Fare</th>
                     <th className="px-4 py-3 text-left font-semibold">Status</th>
+                    <th className="px-4 py-3 text-left font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -225,11 +304,28 @@ const RouteRegistration = () => {
                           {r.status}
                         </span>
                       </td>
+                      <td className="px-4 py-3">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleEdit(r)}
+                            className="px-3 py-1 rounded-lg bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600 transition"
+                            disabled={editingRoute?.id === r.id}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirm(r)}
+                            className="px-3 py-1 rounded-lg bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                   {routes.length === 0 && (
                     <tr>
-                      <td colSpan="6" className="text-center px-4 py-8 text-gray-500">
+                      <td colSpan="7" className="text-center px-4 py-8 text-gray-500">
                         No routes registered yet
                       </td>
                     </tr>
@@ -240,6 +336,42 @@ const RouteRegistration = () => {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setDeleteConfirm(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-900">Confirm Delete</h3>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-700 mb-4">
+                Are you sure you want to delete route <strong>{deleteConfirm.routeNumber}</strong> ({deleteConfirm.start} → {deleteConfirm.destination})?
+              </p>
+              <p className="text-sm text-red-600 mb-6">This action cannot be undone.</p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-700 font-semibold hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDelete(deleteConfirm.id)}
+                  disabled={status?.type === "loading"}
+                  className={`px-4 py-2 rounded-xl font-semibold text-white transition ${
+                    status?.type === "loading"
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-red-500 hover:bg-red-600"
+                  }`}
+                >
+                  {status?.type === "loading" ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

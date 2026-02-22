@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { collection, getDocs, query, orderBy, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, addDoc, serverTimestamp, updateDoc, deleteDoc, doc } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 
 const BusRoute = () => {
@@ -17,6 +17,22 @@ const BusRoute = () => {
     time: ""
   });
   const [scheduleStatus, setScheduleStatus] = useState(null);
+  const [editingRoute, setEditingRoute] = useState(null);
+  const [editingBus, setEditingBus] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [routeForm, setRouteForm] = useState({
+    routeNumber: "",
+    start: "",
+    destination: "",
+    via: "",
+    fare: ""
+  });
+  const [busForm, setBusForm] = useState({
+    busNumber: "",
+    driverName: "",
+    capacity: "",
+    contact: ""
+  });
   
 
   useEffect(() => {
@@ -144,6 +160,116 @@ const BusRoute = () => {
     }
   };
 
+  // 🔹 Handle Route Edit
+  const handleRouteEdit = (route) => {
+    setEditingRoute(route);
+    setRouteForm({
+      routeNumber: route.routeNumber || "",
+      start: route.start || "",
+      destination: route.destination || "",
+      via: route.via || "",
+      fare: route.fare || ""
+    });
+    setSelectedRoute(null);
+  };
+
+  // 🔹 Handle Route Update
+  const handleRouteUpdate = async () => {
+    if (!routeForm.routeNumber || !routeForm.start || !routeForm.destination) {
+      setError("Required fields missing");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await updateDoc(doc(db, "routes", editingRoute.id), {
+        routeNumber: routeForm.routeNumber,
+        start: routeForm.start,
+        destination: routeForm.destination,
+        via: routeForm.via || "",
+        fare: Number(routeForm.fare) || 0,
+      });
+      setEditingRoute(null);
+      setRouteForm({ routeNumber: "", start: "", destination: "", via: "", fare: "" });
+      fetchRoutesAndBuses();
+    } catch (err) {
+      console.error("Error updating route:", err);
+      setError("Failed to update route");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 🔹 Handle Route Delete
+  const handleRouteDelete = async (routeId) => {
+    try {
+      setLoading(true);
+      await deleteDoc(doc(db, "routes", routeId));
+      setDeleteConfirm(null);
+      fetchRoutesAndBuses();
+    } catch (err) {
+      console.error("Error deleting route:", err);
+      setError("Failed to delete route");
+      setDeleteConfirm(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 🔹 Handle Bus Edit
+  const handleBusEdit = (bus) => {
+    setEditingBus(bus);
+    setBusForm({
+      busNumber: bus.busNumber || "",
+      driverName: bus.driverName || "",
+      capacity: bus.capacity || "",
+      contact: bus.contact || ""
+    });
+    setSelectedBus(null);
+  };
+
+  // 🔹 Handle Bus Update
+  const handleBusUpdate = async () => {
+    if (!busForm.busNumber || !busForm.driverName) {
+      setError("Required fields missing");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await updateDoc(doc(db, "buses", editingBus.id), {
+        busNumber: busForm.busNumber,
+        driverName: busForm.driverName,
+        capacity: busForm.capacity ? Number(busForm.capacity) : null,
+        contact: busForm.contact || null,
+      });
+      setEditingBus(null);
+      setBusForm({ busNumber: "", driverName: "", capacity: "", contact: "" });
+      fetchRoutesAndBuses();
+    } catch (err) {
+      console.error("Error updating bus:", err);
+      setError("Failed to update bus");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 🔹 Handle Bus Delete
+  const handleBusDelete = async (busId) => {
+    try {
+      setLoading(true);
+      await deleteDoc(doc(db, "buses", busId));
+      setDeleteConfirm(null);
+      fetchRoutesAndBuses();
+    } catch (err) {
+      console.error("Error deleting bus:", err);
+      setError("Failed to delete bus");
+      setDeleteConfirm(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-gray-100 p-4">
       <div className="w-full max-w-6xl mx-auto">
@@ -243,7 +369,8 @@ const BusRoute = () => {
                           <th className="px-4 py-3 text-left font-semibold">Route</th>
                           <th className="px-4 py-3 text-left font-semibold">Capacity</th>
                           <th className="px-4 py-3 text-left font-semibold">Contact</th>
-                          <th className="px-4 py-3 text-left font-semibold">Action</th>
+                          <th className="px-4 py-3 text-left font-semibold">Schedule</th>
+                          <th className="px-4 py-3 text-left font-semibold">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -285,6 +412,23 @@ const BusRoute = () => {
                                   Schedule
                                 </button>
                               </td>
+                              <td className="px-4 py-3">
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => handleBusEdit(bus)}
+                                    className="px-3 py-1 rounded-lg bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600 transition"
+                                    disabled={editingBus?.id === bus.id}
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => setDeleteConfirm({ type: 'bus', id: bus.id, name: bus.busNumber })}
+                                    className="px-3 py-1 rounded-lg bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </td>
                             </tr>
                           );
                         })}
@@ -309,27 +453,27 @@ const BusRoute = () => {
                         <th className="px-4 py-3 text-left font-semibold">Via</th>
                         <th className="px-4 py-3 text-left font-semibold">Fare</th>
                         <th className="px-4 py-3 text-left font-semibold">Status</th>
+                        <th className="px-4 py-3 text-left font-semibold">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredRoutes.map((route, idx) => (
                         <tr
                           key={route.id}
-                          className={`border-t border-gray-100 cursor-pointer transition ${
-                            selectedRoute?.id === route.id
+                          className={`border-t border-gray-100 transition ${
+                            selectedRoute?.id === route.id || editingRoute?.id === route.id
                               ? 'bg-emerald-50'
                               : idx % 2 === 0
                               ? 'bg-white hover:bg-gray-50'
                               : 'bg-gray-50/50 hover:bg-gray-100'
                           }`}
-                          onClick={() => setSelectedRoute(route)}
                         >
-                          <td className="px-4 py-3 font-semibold text-emerald-600">{route.routeNumber}</td>
-                          <td className="px-4 py-3">{route.start}</td>
-                          <td className="px-4 py-3">{route.destination}</td>
-                          <td className="px-4 py-3">{route.via || '-'}</td>
-                          <td className="px-4 py-3">Rs. {route.fare}</td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 font-semibold text-emerald-600 cursor-pointer" onClick={() => setSelectedRoute(route)}>{route.routeNumber}</td>
+                          <td className="px-4 py-3 cursor-pointer" onClick={() => setSelectedRoute(route)}>{route.start}</td>
+                          <td className="px-4 py-3 cursor-pointer" onClick={() => setSelectedRoute(route)}>{route.destination}</td>
+                          <td className="px-4 py-3 cursor-pointer" onClick={() => setSelectedRoute(route)}>{route.via || '-'}</td>
+                          <td className="px-4 py-3 cursor-pointer" onClick={() => setSelectedRoute(route)}>Rs. {route.fare}</td>
+                          <td className="px-4 py-3 cursor-pointer" onClick={() => setSelectedRoute(route)}>
                             <span
                               className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold ${
                                 route.status === 'Active'
@@ -339,6 +483,23 @@ const BusRoute = () => {
                             >
                               {route.status}
                             </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleRouteEdit(route)}
+                                className="px-3 py-1 rounded-lg bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600 transition"
+                                disabled={editingRoute?.id === route.id}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirm({ type: 'route', id: route.id, name: route.routeNumber })}
+                                className="px-3 py-1 rounded-lg bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition"
+                              >
+                                Delete
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -391,6 +552,7 @@ const BusRoute = () => {
                           <th className="px-4 py-3 text-left font-semibold">Capacity</th>
                           <th className="px-4 py-3 text-left font-semibold">Contact</th>
                           <th className="px-4 py-3 text-left font-semibold">QR Code</th>
+                          <th className="px-4 py-3 text-left font-semibold">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -423,6 +585,23 @@ const BusRoute = () => {
                                 <span className="text-gray-400">-</span>
                               )}
                             </td>
+                            <td className="px-4 py-3">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => handleBusEdit(bus)}
+                                  className="px-3 py-1 rounded-lg bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600 transition"
+                                  disabled={editingBus?.id === bus.id}
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => setDeleteConfirm({ type: 'bus', id: bus.id, name: bus.busNumber })}
+                                  className="px-3 py-1 rounded-lg bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -434,6 +613,99 @@ const BusRoute = () => {
           </div>
         </div>
       </div>
+
+      {/* Route Edit Modal */}
+      {editingRoute && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setEditingRoute(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 flex items-center justify-between rounded-t-2xl" style={{ background: "linear-gradient(135deg, #27ae60 0%, #16c98d 100%)" }}>
+              <h3 className="text-lg font-bold text-white">Edit Route</h3>
+              <button onClick={() => setEditingRoute(null)} className="p-1 rounded-lg text-white hover:bg-white/20 transition">✕</button>
+            </div>
+            <div className="p-6">
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Route Number *</label>
+                <input type="text" value={routeForm.routeNumber} onChange={(e) => setRouteForm({...routeForm, routeNumber: e.target.value})} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100" required />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Start *</label>
+                <input type="text" value={routeForm.start} onChange={(e) => setRouteForm({...routeForm, start: e.target.value})} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100" required />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Destination *</label>
+                <input type="text" value={routeForm.destination} onChange={(e) => setRouteForm({...routeForm, destination: e.target.value})} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100" required />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Via</label>
+                <input type="text" value={routeForm.via} onChange={(e) => setRouteForm({...routeForm, via: e.target.value})} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100" />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Fare</label>
+                <input type="number" value={routeForm.fare} onChange={(e) => setRouteForm({...routeForm, fare: e.target.value})} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100" />
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button onClick={() => setEditingRoute(null)} className="px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-700 font-semibold hover:bg-gray-50 transition">Cancel</button>
+                <button onClick={handleRouteUpdate} disabled={loading} className={`px-4 py-2 rounded-xl font-semibold text-white transition ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}>{loading ? 'Updating...' : 'Update'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bus Edit Modal */}
+      {editingBus && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setEditingBus(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 flex items-center justify-between rounded-t-2xl" style={{ background: "linear-gradient(135deg, #27ae60 0%, #16c98d 100%)" }}>
+              <h3 className="text-lg font-bold text-white">Edit Bus</h3>
+              <button onClick={() => setEditingBus(null)} className="p-1 rounded-lg text-white hover:bg-white/20 transition">✕</button>
+            </div>
+            <div className="p-6">
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Bus Number *</label>
+                <input type="text" value={busForm.busNumber} onChange={(e) => setBusForm({...busForm, busNumber: e.target.value})} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100" required />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Driver Name *</label>
+                <input type="text" value={busForm.driverName} onChange={(e) => setBusForm({...busForm, driverName: e.target.value})} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100" required />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Capacity</label>
+                <input type="number" value={busForm.capacity} onChange={(e) => setBusForm({...busForm, capacity: e.target.value})} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100" />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Contact</label>
+                <input type="text" value={busForm.contact} onChange={(e) => setBusForm({...busForm, contact: e.target.value})} className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100" />
+              </div>
+              <div className="flex justify-end gap-3 mt-6">
+                <button onClick={() => setEditingBus(null)} className="px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-700 font-semibold hover:bg-gray-50 transition">Cancel</button>
+                <button onClick={handleBusUpdate} disabled={loading} className={`px-4 py-2 rounded-xl font-semibold text-white transition ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}>{loading ? 'Updating...' : 'Update'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setDeleteConfirm(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-900">Confirm Delete</h3>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-700 mb-4">
+                Are you sure you want to delete {deleteConfirm.type === 'route' ? 'route' : 'bus'} <strong>{deleteConfirm.name}</strong>?
+              </p>
+              <p className="text-sm text-red-600 mb-6">This action cannot be undone.</p>
+              <div className="flex justify-end gap-3">
+                <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-700 font-semibold hover:bg-gray-50 transition">Cancel</button>
+                <button onClick={() => deleteConfirm.type === 'route' ? handleRouteDelete(deleteConfirm.id) : handleBusDelete(deleteConfirm.id)} disabled={loading} className={`px-4 py-2 rounded-xl font-semibold text-white transition ${loading ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-500 hover:bg-red-600'}`}>{loading ? 'Deleting...' : 'Delete'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Schedule Modal */}
       {showScheduleModal && selectedBus && (
