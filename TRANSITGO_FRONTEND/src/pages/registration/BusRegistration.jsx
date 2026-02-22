@@ -8,6 +8,7 @@ import {
   query,
   orderBy,
   updateDoc,
+  deleteDoc,
   doc,
 } from "firebase/firestore";
 import QRCode from "qrcode";
@@ -25,6 +26,8 @@ const BusRegistration = () => {
   const [selectedBus, setSelectedBus] = useState(null);
   const [availableRoutes, setAvailableRoutes] = useState([]);
   const [routeLoading, setRouteLoading] = useState(false);
+  const [editingBus, setEditingBus] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   const labelClass = "block text-sm font-medium text-gray-700";
   const inputClass =
@@ -104,24 +107,41 @@ const BusRegistration = () => {
     try {
       const selectedRoute = availableRoutes.find((r) => r.id === form.routeId);
 
-      const docRef = await addDoc(collection(db, "buses"), {
-        busNumber: form.busNumber,
-        driverName: form.driverName,
-        routeId: selectedRoute.id, // ✅ saved
-        routeNumber: selectedRoute.routeNumber, // ✅ saved
-        capacity: form.capacity ? Number(form.capacity) : null,
-        contact: form.contact || null,
-        createdAt: serverTimestamp(),
-      });
+      if (editingBus) {
+        // Update existing bus
+        await updateDoc(doc(db, "buses", editingBus.id), {
+          busNumber: form.busNumber,
+          driverName: form.driverName,
+          routeId: selectedRoute.id,
+          routeNumber: selectedRoute.routeNumber,
+          capacity: form.capacity ? Number(form.capacity) : null,
+          contact: form.contact || null,
+        });
 
-      const qrPayload = `transitgo://bus/${docRef.id}`;
-      const qrDataUrl = await QRCode.toDataURL(qrPayload);
+        setStatus({ type: "success", msg: "Bus updated successfully 🚍" });
+        setEditingBus(null);
+      } else {
+        // Create new bus
+        const docRef = await addDoc(collection(db, "buses"), {
+          busNumber: form.busNumber,
+          driverName: form.driverName,
+          routeId: selectedRoute.id, // ✅ saved
+          routeNumber: selectedRoute.routeNumber, // ✅ saved
+          capacity: form.capacity ? Number(form.capacity) : null,
+          contact: form.contact || null,
+          createdAt: serverTimestamp(),
+        });
 
-      await updateDoc(doc(db, "buses", docRef.id), {
-        qrCode: qrDataUrl,
-      });
+        const qrPayload = `transitgo://bus/${docRef.id}`;
+        const qrDataUrl = await QRCode.toDataURL(qrPayload);
 
-      setStatus({ type: "success", msg: "Bus registered successfully 🚍" });
+        await updateDoc(doc(db, "buses", docRef.id), {
+          qrCode: qrDataUrl,
+        });
+
+        setStatus({ type: "success", msg: "Bus registered successfully 🚍" });
+      }
+
       setForm({
         busNumber: "",
         driverName: "",
@@ -132,7 +152,52 @@ const BusRegistration = () => {
       fetchBuses();
     } catch (err) {
       console.error(err);
-      setStatus({ type: "error", msg: "Failed to register bus." });
+      setStatus({ type: "error", msg: editingBus ? "Failed to update bus." : "Failed to register bus." });
+    }
+  };
+
+  // 🔹 Handle Edit
+  const handleEdit = (bus) => {
+    setEditingBus(bus);
+    setForm({
+      busNumber: bus.busNumber || "",
+      driverName: bus.driverName || "",
+      routeId: bus.routeId || "",
+      capacity: bus.capacity || "",
+      contact: bus.contact || "",
+    });
+    setStatus(null);
+    setSelectedBus(null);
+    // Scroll to form
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  // 🔹 Handle Cancel Edit
+  const handleCancelEdit = () => {
+    setEditingBus(null);
+    setForm({
+      busNumber: "",
+      driverName: "",
+      routeId: "",
+      capacity: "",
+      contact: "",
+    });
+    setStatus(null);
+  };
+
+  // 🔹 Handle Delete
+  const handleDelete = async (busId) => {
+    try {
+      setStatus({ type: "loading" });
+      await deleteDoc(doc(db, "buses", busId));
+      setStatus({ type: "success", msg: "Bus deleted successfully 🗑️" });
+      setDeleteConfirm(null);
+      setSelectedBus(null);
+      fetchBuses();
+    } catch (err) {
+      console.error(err);
+      setStatus({ type: "error", msg: "Failed to delete bus" });
+      setDeleteConfirm(null);
     }
   };
 
@@ -149,11 +214,10 @@ const BusRegistration = () => {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-2xl font-bold text-white">
-                  Bus Registration
+                  {editingBus ? "Edit Bus" : "Bus Registration"}
                 </h2>
                 <p className="mt-1 text-sm text-white/90">
-                  Register a new bus and generate a QR code for quick
-                  identification.
+                  {editingBus ? "Update bus details" : "Register a new bus and generate a QR code for quick identification."}
                 </p>
               </div>
               <div className="rounded-2xl bg-white/20 px-4 py-2 text-sm text-white font-medium">
@@ -388,22 +452,32 @@ const BusRegistration = () => {
                 )}
 
                 <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setForm({
-                        busNumber: "",
-                        driverName: "",
-                        route: "",
-                        capacity: "",
-                        contact: "",
-                      });
-                      setStatus(null);
-                    }}
-                    className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50"
-                  >
-                    Clear
-                  </button>
+                  {editingBus ? (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForm({
+                          busNumber: "",
+                          driverName: "",
+                          routeId: "",
+                          capacity: "",
+                          contact: "",
+                        });
+                        setStatus(null);
+                      }}
+                      className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50"
+                    >
+                      Clear
+                    </button>
+                  )}
 
                   <button
                     type="submit"
@@ -416,7 +490,9 @@ const BusRegistration = () => {
                       }
                     `}
                   >
-                    {status?.type === "loading" ? "Saving..." : "Register Bus"}
+                    {status?.type === "loading" 
+                      ? (editingBus ? "Updating..." : "Saving...") 
+                      : (editingBus ? "Update Bus" : "Register Bus")}
                   </button>
                 </div>
               </div>
@@ -436,13 +512,14 @@ const BusRegistration = () => {
                       <th className="px-4 py-2">Contact</th>
                       <th className="px-4 py-2">QR</th>
                       <th className="px-4 py-2">Created At</th>
+                      <th className="px-4 py-2">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {buses.length === 0 && (
                       <tr>
                         <td
-                          colSpan="7"
+                          colSpan="8"
                           className="px-4 py-6 text-center text-gray-500"
                         >
                           No buses registered yet.
@@ -452,15 +529,14 @@ const BusRegistration = () => {
                     {buses.map((b) => (
                       <tr
                         key={b.id}
-                        className={`border-t cursor-pointer ${selectedBus && selectedBus.id === b.id ? "bg-emerald-50" : ""}`}
-                        onClick={() => setSelectedBus(b)}
+                        className={`border-t ${selectedBus && selectedBus.id === b.id ? "bg-emerald-50" : ""}`}
                       >
-                        <td className="px-4 py-2">{b.busNumber}</td>
-                        <td className="px-4 py-2">{b.driverName}</td>
-                        <td className="px-4 py-2">{b.routeNumber ?? b.route ?? "-"}</td>
-                        <td className="px-4 py-2">{b.capacity ?? "-"}</td>
-                        <td className="px-4 py-2">{b.contact ?? "-"}</td>
-                        <td className="px-4 py-2">
+                        <td className="px-4 py-2 cursor-pointer" onClick={() => setSelectedBus(b)}>{b.busNumber}</td>
+                        <td className="px-4 py-2 cursor-pointer" onClick={() => setSelectedBus(b)}>{b.driverName}</td>
+                        <td className="px-4 py-2 cursor-pointer" onClick={() => setSelectedBus(b)}>{b.routeNumber ?? b.route ?? "-"}</td>
+                        <td className="px-4 py-2 cursor-pointer" onClick={() => setSelectedBus(b)}>{b.capacity ?? "-"}</td>
+                        <td className="px-4 py-2 cursor-pointer" onClick={() => setSelectedBus(b)}>{b.contact ?? "-"}</td>
+                        <td className="px-4 py-2 cursor-pointer" onClick={() => setSelectedBus(b)}>
                           {b.qrCode ? (
                             <img
                               src={b.qrCode}
@@ -476,10 +552,27 @@ const BusRegistration = () => {
                             <span className="text-gray-400">-</span>
                           )}
                         </td>
-                        <td className="px-4 py-2">
+                        <td className="px-4 py-2 cursor-pointer" onClick={() => setSelectedBus(b)}>
                           {b.createdAt
                             ? new Date(b.createdAt).toLocaleString()
                             : "-"}
+                        </td>
+                        <td className="px-4 py-2">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleEdit(b)}
+                              className="px-3 py-1 rounded-lg bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600 transition"
+                              disabled={editingBus?.id === b.id}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirm(b)}
+                              className="px-3 py-1 rounded-lg bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -553,6 +646,42 @@ const BusRegistration = () => {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => setDeleteConfirm(null)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-900">Confirm Delete</h3>
+            </div>
+            <div className="p-6">
+              <p className="text-gray-700 mb-4">
+                Are you sure you want to delete bus <strong>{deleteConfirm.busNumber}</strong> (Driver: {deleteConfirm.driverName})?
+              </p>
+              <p className="text-sm text-red-600 mb-6">This action cannot be undone.</p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="px-4 py-2 rounded-xl border border-gray-200 bg-white text-gray-700 font-semibold hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDelete(deleteConfirm.id)}
+                  disabled={status?.type === "loading"}
+                  className={`px-4 py-2 rounded-xl font-semibold text-white transition ${
+                    status?.type === "loading"
+                      ? "bg-gray-400 cursor-not-allowed"
+                      : "bg-red-500 hover:bg-red-600"
+                  }`}
+                >
+                  {status?.type === "loading" ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
