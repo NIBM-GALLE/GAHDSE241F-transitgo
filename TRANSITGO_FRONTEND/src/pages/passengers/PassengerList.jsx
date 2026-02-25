@@ -17,6 +17,7 @@ import {
   MdDelete,
   MdClose,
 } from "react-icons/md";
+import { toast } from "react-toastify";
 
 const PassengerList = () => {
   const [passengers, setPassengers] = useState([]);
@@ -61,7 +62,7 @@ const PassengerList = () => {
       setPassengers(list);
     } catch (err) {
       console.error("fetchPassengers error:", err);
-      setStatus({ type: "error", msg: "Failed to load passengers." });
+      toast.error("Failed to load passengers.");
     } finally {
       setLoading(false);
     }
@@ -91,7 +92,7 @@ const PassengerList = () => {
     e.preventDefault();
     if (!editPassenger) return;
     if (!editForm.fullName?.trim() || !editForm.nicPassport?.trim() || !editForm.phone?.trim()) {
-      setStatus({ type: "error", msg: "Full Name, NIC/Passport and Phone are required." });
+      toast.error("Full Name, NIC/Passport and Phone are required.");
       return;
     }
     setStatus({ type: "loading" });
@@ -105,12 +106,14 @@ const PassengerList = () => {
         dateOfBirth: editForm.dateOfBirth || null,
         updatedAt: new Date().toISOString(),
       });
-      setStatus({ type: "success", msg: "Passenger updated successfully." });
+      toast.success("Passenger updated successfully.");
       setEditPassenger(null);
       fetchPassengers();
     } catch (err) {
       console.error(err);
-      setStatus({ type: "error", msg: "Failed to update passenger." });
+      toast.error("Failed to update passenger.");
+    } finally {
+      setStatus(null);
     }
   };
 
@@ -122,14 +125,13 @@ const PassengerList = () => {
         status: newStatus,
         updatedAt: new Date().toISOString(),
       });
-      setStatus({
-        type: "success",
-        msg: `Passenger ${newStatus === "Blocked" ? "deactivated" : "activated"} successfully.`,
-      });
+      toast.success(
+        `Passenger ${newStatus === "Blocked" ? "deactivated" : "activated"} successfully.`,
+      );
       fetchPassengers();
     } catch (err) {
       console.error(err);
-      setStatus({ type: "error", msg: "Failed to update status." });
+      toast.error("Failed to update status.");
     }
   };
 
@@ -137,12 +139,12 @@ const PassengerList = () => {
     setConfirmAction(null);
     try {
       await deleteDoc(doc(db, "passengers", p.id));
-      setStatus({ type: "success", msg: "Passenger deleted permanently." });
+      toast.success("Passenger deleted permanently.");
       setViewPassenger(null);
       fetchPassengers();
     } catch (err) {
       console.error(err);
-      setStatus({ type: "error", msg: "Failed to delete passenger." });
+      toast.error("Failed to delete passenger.");
     }
   };
 
@@ -164,18 +166,7 @@ const PassengerList = () => {
             </p>
           </div>
 
-          <div className="p-6">
-            {status?.type === "success" && (
-              <div className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-green-800">
-                {status.msg}
-              </div>
-            )}
-            {status?.type === "error" && (
-              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800">
-                {status.msg}
-              </div>
-            )}
-
+            <div className="p-6">
             {loading ? (
               <div className="py-12 text-center text-gray-500">
                 Loading passengers...

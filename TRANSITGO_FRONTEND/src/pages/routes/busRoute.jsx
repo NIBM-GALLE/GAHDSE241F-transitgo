@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { collection, getDocs, query, orderBy, addDoc, serverTimestamp, updateDoc, deleteDoc, doc } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
+import { toast } from "react-toastify";
 
 const BusRoute = () => {
   const [routes, setRoutes] = useState([]);
@@ -123,14 +124,13 @@ const BusRoute = () => {
     e.preventDefault();
     
     if (!scheduleForm.date || !scheduleForm.time) {
-      setScheduleStatus({ type: "error", msg: "Please fill in both date and time" });
+      toast.error("Please fill in both date and time");
       return;
     }
 
     try {
       setScheduleStatus({ type: "loading" });
 
-      // Find the route for this bus
       const busRoute = routes.find(r => 
         r.routeNumber === selectedBus.routeNumber || r.routeNumber === selectedBus.route
       );
@@ -148,15 +148,16 @@ const BusRoute = () => {
         createdAt: serverTimestamp()
       });
 
-      setScheduleStatus({ type: "success", msg: "Schedule saved successfully! 🎉" });
-      
-      // Close modal after 1.5 seconds
+      toast.success("Schedule saved successfully! 🎉");
+
       setTimeout(() => {
         handleCloseModal();
       }, 1500);
     } catch (err) {
       console.error("Error saving schedule:", err);
-      setScheduleStatus({ type: "error", msg: "Failed to save schedule" });
+      toast.error("Failed to save schedule");
+    } finally {
+      setScheduleStatus(null);
     }
   };
 
@@ -176,7 +177,7 @@ const BusRoute = () => {
   // 🔹 Handle Route Update
   const handleRouteUpdate = async () => {
     if (!routeForm.routeNumber || !routeForm.start || !routeForm.destination) {
-      setError("Required fields missing");
+      toast.error("Required fields missing");
       return;
     }
 
@@ -189,12 +190,13 @@ const BusRoute = () => {
         via: routeForm.via || "",
         fare: Number(routeForm.fare) || 0,
       });
+      toast.success("Route updated successfully");
       setEditingRoute(null);
       setRouteForm({ routeNumber: "", start: "", destination: "", via: "", fare: "" });
       fetchRoutesAndBuses();
     } catch (err) {
       console.error("Error updating route:", err);
-      setError("Failed to update route");
+      toast.error("Failed to update route");
     } finally {
       setLoading(false);
     }
@@ -205,11 +207,12 @@ const BusRoute = () => {
     try {
       setLoading(true);
       await deleteDoc(doc(db, "routes", routeId));
+      toast.success("Route deleted successfully");
       setDeleteConfirm(null);
       fetchRoutesAndBuses();
     } catch (err) {
       console.error("Error deleting route:", err);
-      setError("Failed to delete route");
+      toast.error("Failed to delete route");
       setDeleteConfirm(null);
     } finally {
       setLoading(false);
@@ -231,7 +234,7 @@ const BusRoute = () => {
   // 🔹 Handle Bus Update
   const handleBusUpdate = async () => {
     if (!busForm.busNumber || !busForm.driverName) {
-      setError("Required fields missing");
+      toast.error("Required fields missing");
       return;
     }
 
@@ -243,12 +246,13 @@ const BusRoute = () => {
         capacity: busForm.capacity ? Number(busForm.capacity) : null,
         contact: busForm.contact || null,
       });
+      toast.success("Bus updated successfully");
       setEditingBus(null);
       setBusForm({ busNumber: "", driverName: "", capacity: "", contact: "" });
       fetchRoutesAndBuses();
     } catch (err) {
       console.error("Error updating bus:", err);
-      setError("Failed to update bus");
+      toast.error("Failed to update bus");
     } finally {
       setLoading(false);
     }
@@ -259,11 +263,12 @@ const BusRoute = () => {
     try {
       setLoading(true);
       await deleteDoc(doc(db, "buses", busId));
+      toast.success("Bus deleted successfully");
       setDeleteConfirm(null);
       fetchRoutesAndBuses();
     } catch (err) {
       console.error("Error deleting bus:", err);
-      setError("Failed to delete bus");
+      toast.error("Failed to delete bus");
       setDeleteConfirm(null);
     } finally {
       setLoading(false);
@@ -756,18 +761,6 @@ const BusRoute = () => {
                     className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-gray-900 shadow-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-100"
                   />
                 </div>
-
-                {scheduleStatus && (
-                  <div
-                    className={`mb-5 rounded-xl px-4 py-3 text-sm font-medium ${
-                      scheduleStatus.type === 'success'
-                        ? 'border border-green-200 bg-green-50 text-green-800'
-                        : 'border border-red-200 bg-red-50 text-red-800'
-                    }`}
-                  >
-                    {scheduleStatus.msg}
-                  </div>
-                )}
 
                 <div className="flex justify-end gap-3 mt-6">
                   <button

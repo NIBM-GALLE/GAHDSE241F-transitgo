@@ -12,6 +12,7 @@ import {
   doc,
 } from "firebase/firestore";
 import QRCode from "qrcode";
+import { toast } from "react-toastify";
 
 const BusRegistration = () => {
   const [form, setForm] = useState({
@@ -98,7 +99,7 @@ const BusRegistration = () => {
     e.preventDefault();
 
     if (!form.busNumber || !form.driverName || !form.routeId) {
-      setStatus({ type: "error", msg: "Please fill all required fields." });
+      toast.error("Please fill all required fields.");
       return;
     }
 
@@ -108,7 +109,6 @@ const BusRegistration = () => {
       const selectedRoute = availableRoutes.find((r) => r.id === form.routeId);
 
       if (editingBus) {
-        // Update existing bus
         await updateDoc(doc(db, "buses", editingBus.id), {
           busNumber: form.busNumber,
           driverName: form.driverName,
@@ -118,15 +118,14 @@ const BusRegistration = () => {
           contact: form.contact || null,
         });
 
-        setStatus({ type: "success", msg: "Bus updated successfully 🚍" });
+        toast.success("Bus updated successfully 🚍");
         setEditingBus(null);
       } else {
-        // Create new bus
         const docRef = await addDoc(collection(db, "buses"), {
           busNumber: form.busNumber,
           driverName: form.driverName,
-          routeId: selectedRoute.id, // ✅ saved
-          routeNumber: selectedRoute.routeNumber, // ✅ saved
+          routeId: selectedRoute.id,
+          routeNumber: selectedRoute.routeNumber,
           capacity: form.capacity ? Number(form.capacity) : null,
           contact: form.contact || null,
           createdAt: serverTimestamp(),
@@ -139,7 +138,7 @@ const BusRegistration = () => {
           qrCode: qrDataUrl,
         });
 
-        setStatus({ type: "success", msg: "Bus registered successfully 🚍" });
+        toast.success("Bus registered successfully 🚍");
       }
 
       setForm({
@@ -152,11 +151,12 @@ const BusRegistration = () => {
       fetchBuses();
     } catch (err) {
       console.error(err);
-      setStatus({ type: "error", msg: editingBus ? "Failed to update bus." : "Failed to register bus." });
+      toast.error(editingBus ? "Failed to update bus." : "Failed to register bus.");
+    } finally {
+      setStatus(null);
     }
   };
 
-  // 🔹 Handle Edit
   const handleEdit = (bus) => {
     setEditingBus(bus);
     setForm({
@@ -168,11 +168,10 @@ const BusRegistration = () => {
     });
     setStatus(null);
     setSelectedBus(null);
-    // Scroll to form
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // 🔹 Handle Cancel Edit
+  
   const handleCancelEdit = () => {
     setEditingBus(null);
     setForm({
@@ -185,19 +184,20 @@ const BusRegistration = () => {
     setStatus(null);
   };
 
-  // 🔹 Handle Delete
   const handleDelete = async (busId) => {
     try {
       setStatus({ type: "loading" });
       await deleteDoc(doc(db, "buses", busId));
-      setStatus({ type: "success", msg: "Bus deleted successfully 🗑️" });
+      toast.success("Bus deleted successfully 🗑️");
       setDeleteConfirm(null);
       setSelectedBus(null);
       fetchBuses();
     } catch (err) {
       console.error(err);
-      setStatus({ type: "error", msg: "Failed to delete bus" });
+      toast.error("Failed to delete bus");
       setDeleteConfirm(null);
+    } finally {
+      setStatus(null);
     }
   };
 
@@ -437,19 +437,6 @@ const BusRegistration = () => {
                     />
                   </div>
                 </div>
-
-                {/* Status Messages */}
-                {status?.type === "success" && (
-                  <div className="mt-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-green-800">
-                    <div className="font-medium">{status.msg}</div>
-                  </div>
-                )}
-
-                {status?.type === "error" && (
-                  <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800">
-                    <div className="font-medium">{status.msg}</div>
-                  </div>
-                )}
 
                 <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                   {editingBus ? (
