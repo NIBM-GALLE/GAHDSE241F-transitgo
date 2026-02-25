@@ -20,6 +20,9 @@ import {
     addDoc,
     serverTimestamp,
     getDocs,
+    query,
+    where,
+    updateDoc,
 } from "firebase/firestore";
 
 const QRPayScreen = ({ navigation }) => {
@@ -27,6 +30,7 @@ const QRPayScreen = ({ navigation }) => {
     const [scanned, setScanned] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [paymentResult, setPaymentResult] = useState(null);
+    const [boardingResult, setBoardingResult] = useState(null);
     const [routes, setRoutes] = useState([]);
 
     useEffect(() => {
@@ -76,38 +80,78 @@ const QRPayScreen = ({ navigation }) => {
                 return;
             }
 
-            // Create payment record
-            const paymentData = {
-                userId: user.uid,
-                userName: user.displayName || user.email,
-                busId: busId,
-                busNumber: busData.busNumber || "N/A",
-                routeNumber: busData.routeNumber || busData.route || "N/A",
-                destination: routeInfo?.destination || "N/A",
-                start: routeInfo?.start || "N/A",
-                amount: fare,
-                date: new Date().toISOString().split("T")[0],
-                time: new Date().toLocaleTimeString(),
-                status: "Completed",
-                paymentMethod: "QR Scan",
-                createdAt: serverTimestamp(),
-            };
+            // ─── Check for existing confirmed booking for this bus today ───
+            const todayStr = new Date().toISOString().split("T")[0];
+            const bookingsSnap = await getDocs(
+                query(
+                    collection(db, "bookings"),
+                    where("userId", "==", user.uid),
+                    where("status", "==", "Confirmed")
+                )
+            );
 
-            await addDoc(collection(db, "payments"), paymentData);
-
-            setPaymentResult({
-                busNumber: busData.busNumber,
-                driverName: busData.driverName,
-                routeNumber: busData.routeNumber || busData.route,
-                destination: routeInfo?.destination || "N/A",
-                start: routeInfo?.start || "N/A",
-                fare: fare,
-                date: paymentData.date,
-                time: paymentData.time,
+            // Find a booking matching this bus and today's date
+            const matchingBooking = bookingsSnap.docs.find((d) => {
+                const b = d.data();
+                return (
+                    (b.busId === busId ||
+                        b.busNumber === busData.busNumber) &&
+                    b.date === todayStr
+                );
             });
+
+            if (matchingBooking) {
+                // ─── Boarding flow: mark as boarded ───
+                const bookingData = matchingBooking.data();
+                await updateDoc(doc(db, "bookings", matchingBooking.id), {
+                    status: "Boarded",
+                });
+
+                setBoardingResult({
+                    busNumber: busData.busNumber,
+                    driverName: busData.driverName,
+                    routeNumber: bookingData.routeNumber,
+                    start: bookingData.start,
+                    destination: bookingData.destination,
+                    seats: bookingData.seats || [],
+                    date: bookingData.date,
+                    time: bookingData.time,
+                    totalFare: bookingData.totalFare || 0,
+                });
+            } else {
+                // ─── Normal daily payment flow ───
+                const paymentData = {
+                    userId: user.uid,
+                    userName: user.displayName || user.email,
+                    busId: busId,
+                    busNumber: busData.busNumber || "N/A",
+                    routeNumber: busData.routeNumber || busData.route || "N/A",
+                    destination: routeInfo?.destination || "N/A",
+                    start: routeInfo?.start || "N/A",
+                    amount: fare,
+                    date: todayStr,
+                    time: new Date().toLocaleTimeString(),
+                    status: "Completed",
+                    paymentMethod: "QR Scan",
+                    createdAt: serverTimestamp(),
+                };
+
+                await addDoc(collection(db, "payments"), paymentData);
+
+                setPaymentResult({
+                    busNumber: busData.busNumber,
+                    driverName: busData.driverName,
+                    routeNumber: busData.routeNumber || busData.route,
+                    destination: routeInfo?.destination || "N/A",
+                    start: routeInfo?.start || "N/A",
+                    fare: fare,
+                    date: paymentData.date,
+                    time: paymentData.time,
+                });
+            }
         } catch (err) {
             console.log("Payment error:", err);
-            Alert.alert("Error", "Failed to process payment. Please try again.");
+            Alert.alert("Error", "Failed to process. Please try again.");
         } finally {
             setProcessing(false);
         }
@@ -116,6 +160,7 @@ const QRPayScreen = ({ navigation }) => {
     const resetScanner = () => {
         setScanned(false);
         setPaymentResult(null);
+        setBoardingResult(null);
     };
 
     // Permission not determined yet
@@ -156,6 +201,106 @@ const QRPayScreen = ({ navigation }) => {
                             </LinearGradient>
                         </TouchableOpacity>
                     </View>
+                </LinearGradient>
+            </View>
+        );
+    }
+
+    // ─── Boarding confirmation screen ───
+    if (boardingResult) {
+        return (
+            <View style={styles.container}>
+                <StatusBar barStyle="light-content" />
+                <LinearGradient colors={["#0f2027", "#203a43", "#2c5364"]} style={{ flex: 1 }}>
+                    <ScrollView contentContainerStyle={styles.resultContainer}>
+                        <View style={styles.boardingIconWrap}>
+                            <View style={styles.boardingIconCircle}>
+                                <Ionicons name="shield-checkmark" size={52} color="#fff" />
+                            </View>
+                        </View>
+                        <Text style={styles.boardingTitle}>Boarding Confirmed!</Text>
+                        <Text style={styles.boardingSub}>
+                            Your booked ticket has been validated
+                        </Text>
+
+                        <View style={styles.receiptCard}>
+                            <View style={styles.receiptHeader}>
+                                <Ionicons name="ticket" size={20} color="#27ae60" />
+                                <Text style={styles.receiptTitle}>Boarding Pass</Text>
+                            </View>
+
+                            <View style={styles.receiptDivider} />
+
+                            <View style={styles.receiptRow}>
+                                <Text style={styles.receiptLabel}>Bus</Text>
+                                <Text style={styles.receiptValue}>{boardingResult.busNumber}</Text>
+                            </View>
+                            <View style={styles.receiptRow}>
+                                <Text style={styles.receiptLabel}>Route</Text>
+                                <Text style={styles.receiptValue}>{boardingResult.routeNumber}</Text>
+                            </View>
+                            <View style={styles.receiptRow}>
+                                <Text style={styles.receiptLabel}>From</Text>
+                                <Text style={styles.receiptValue}>{boardingResult.start}</Text>
+                            </View>
+                            <View style={styles.receiptRow}>
+                                <Text style={styles.receiptLabel}>To</Text>
+                                <Text style={styles.receiptValue}>{boardingResult.destination}</Text>
+                            </View>
+
+                            <View style={styles.receiptDivider} />
+
+                            <View style={styles.receiptRow}>
+                                <Text style={styles.receiptLabel}>Date</Text>
+                                <Text style={styles.receiptValue}>{boardingResult.date}</Text>
+                            </View>
+                            <View style={styles.receiptRow}>
+                                <Text style={styles.receiptLabel}>Time</Text>
+                                <Text style={styles.receiptValue}>{boardingResult.time}</Text>
+                            </View>
+                            {boardingResult.seats.length > 0 && (
+                                <View style={styles.receiptRow}>
+                                    <Text style={styles.receiptLabel}>Seats</Text>
+                                    <Text style={styles.receiptValue}>
+                                        {boardingResult.seats.join(", ")}
+                                    </Text>
+                                </View>
+                            )}
+
+                            <View style={styles.receiptDivider} />
+
+                            <View style={styles.receiptRow}>
+                                <Text style={[styles.receiptLabel, { fontWeight: "700", fontSize: 16 }]}>
+                                    Paid
+                                </Text>
+                                <Text style={styles.fareAmount}>Rs. {boardingResult.totalFare}</Text>
+                            </View>
+
+                            <View style={styles.boardingBadge}>
+                                <Ionicons name="checkmark-circle" size={16} color="#27ae60" />
+                                <Text style={styles.boardingBadgeText}>BOARDED</Text>
+                            </View>
+                        </View>
+
+                        <TouchableOpacity style={styles.scanAgainBtn} onPress={resetScanner}>
+                            <LinearGradient
+                                colors={["#27ae60", "#16c98d"]}
+                                style={styles.scanAgainGrad}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 0 }}
+                            >
+                                <Ionicons name="qr-code" size={20} color="#fff" />
+                                <Text style={styles.scanAgainText}>Scan Another</Text>
+                            </LinearGradient>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.goHomeBtn}
+                            onPress={() => navigation.navigate("Home")}
+                        >
+                            <Text style={styles.goHomeText}>Go to Home</Text>
+                        </TouchableOpacity>
+                    </ScrollView>
                 </LinearGradient>
             </View>
         );
@@ -280,11 +425,11 @@ const QRPayScreen = ({ navigation }) => {
                     {processing && (
                         <View style={styles.processingBox}>
                             <ActivityIndicator size="small" color="#fff" />
-                            <Text style={styles.processingText}>Processing payment...</Text>
+                            <Text style={styles.processingText}>Processing...</Text>
                         </View>
                     )}
 
-                    {scanned && !processing && !paymentResult && (
+                    {scanned && !processing && !paymentResult && !boardingResult && (
                         <TouchableOpacity style={styles.rescanBtn} onPress={resetScanner}>
                             <Ionicons name="refresh" size={18} color="#fff" />
                             <Text style={styles.rescanText}>Tap to rescan</Text>
@@ -366,6 +511,44 @@ const styles = StyleSheet.create({
     successIcon: { marginBottom: 16 },
     successTitle: { fontSize: 26, fontWeight: "800", color: "#fff", marginBottom: 4 },
     successSub: { fontSize: 14, color: "rgba(255,255,255,0.5)", marginBottom: 28 },
+
+    // Boarding-specific
+    boardingIconWrap: { marginBottom: 16 },
+    boardingIconCircle: {
+        width: 88,
+        height: 88,
+        borderRadius: 44,
+        backgroundColor: "#27ae60",
+        justifyContent: "center",
+        alignItems: "center",
+        elevation: 4,
+        shadowColor: "#27ae60",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+    },
+    boardingTitle: { fontSize: 26, fontWeight: "800", color: "#fff", marginBottom: 4 },
+    boardingSub: { fontSize: 14, color: "rgba(255,255,255,0.5)", marginBottom: 28 },
+    boardingBadge: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        marginTop: 16,
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+        borderRadius: 20,
+        backgroundColor: "rgba(39,174,96,0.15)",
+        alignSelf: "center",
+    },
+    boardingBadgeText: {
+        fontSize: 13,
+        fontWeight: "800",
+        color: "#27ae60",
+        letterSpacing: 1,
+    },
+
+    // Receipt card (shared)
     receiptCard: {
         width: "100%",
         backgroundColor: "rgba(255,255,255,0.08)",

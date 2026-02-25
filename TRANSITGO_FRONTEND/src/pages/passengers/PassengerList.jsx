@@ -8,6 +8,7 @@ import {
   deleteDoc,
   query,
   orderBy,
+  where,
 } from "firebase/firestore";
 import {
   MdVisibility,
@@ -16,6 +17,8 @@ import {
   MdCheckCircle,
   MdDelete,
   MdClose,
+  MdPhoneAndroid,
+  MdPersonAdd,
 } from "react-icons/md";
 import { toast } from "react-toastify";
 
@@ -27,6 +30,7 @@ const PassengerList = () => {
   const [editForm, setEditForm] = useState({});
   const [status, setStatus] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null);
+  const [filterSource, setFilterSource] = useState("all"); // "all", "registered", "app"
 
   const labelClass = "block text-sm font-medium text-gray-700";
   const inputClass =
@@ -35,12 +39,14 @@ const PassengerList = () => {
   const fetchPassengers = async () => {
     try {
       setLoading(true);
-      const q = query(
+
+      // Fetch registered passengers
+      const pQuery = query(
         collection(db, "passengers"),
         orderBy("createdAt", "desc")
       );
-      const snap = await getDocs(q);
-      const list = snap.docs.map((docSnap) => {
+      const pSnap = await getDocs(pQuery);
+      const registeredList = pSnap.docs.map((docSnap) => {
         const d = docSnap.data() || {};
         let createdAt = null;
         if (d.createdAt?.toDate) createdAt = d.createdAt.toDate().toISOString();
@@ -57,9 +63,35 @@ const PassengerList = () => {
           dateOfBirth: d.dateOfBirth ?? null,
           status: d.status ?? "Active",
           createdAt,
+          source: "registered",
         };
       });
-      setPassengers(list);
+
+      // Fetch mobile app users
+      const uQuery = query(
+        collection(db, "users"),
+        where("platform", "==", "mobile")
+      );
+      const uSnap = await getDocs(uQuery);
+      const appUserList = uSnap.docs.map((docSnap) => {
+        const d = docSnap.data() || {};
+        return {
+          id: docSnap.id,
+          passengerId: d.uid ? `APP-${d.uid.slice(0, 6).toUpperCase()}` : "-",
+          fullName: d.username ?? d.email ?? "-",
+          nicPassport: "-",
+          phone: "-",
+          email: d.email ?? null,
+          gender: "-",
+          dateOfBirth: null,
+          status: "Active",
+          createdAt: d.createdAt ?? null,
+          source: "app",
+          uid: d.uid ?? null,
+        };
+      });
+
+      setPassengers([...registeredList, ...appUserList]);
     } catch (err) {
       console.error("fetchPassengers error:", err);
       toast.error("Failed to load passengers.");
@@ -148,6 +180,16 @@ const PassengerList = () => {
     }
   };
 
+  // Filtered list based on source filter
+  const filteredPassengers = passengers.filter((p) => {
+    if (filterSource === "all") return true;
+    return p.source === filterSource;
+  });
+
+  // Counts for filter badges
+  const registeredCount = passengers.filter((p) => p.source === "registered").length;
+  const appCount = passengers.filter((p) => p.source === "app").length;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-gray-100 p-4">
       <div className="w-full max-w-8xl mx-auto">
@@ -162,11 +204,47 @@ const PassengerList = () => {
               Passenger List
             </h2>
             <p className="mt-1 text-sm text-white/90">
-              View, edit and manage registered passengers.
+              View, edit and manage registered passengers and app users.
             </p>
           </div>
 
-            <div className="p-6">
+          {/* Source filter tabs */}
+          <div className="px-6 pt-4 pb-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setFilterSource("all")}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${filterSource === "all"
+                  ? "bg-emerald-600 text-white shadow"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+            >
+              All ({passengers.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterSource("registered")}
+              className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition ${filterSource === "registered"
+                  ? "bg-emerald-600 text-white shadow"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+            >
+              <MdPersonAdd size={15} />
+              Registered ({registeredCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterSource("app")}
+              className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition ${filterSource === "app"
+                  ? "bg-blue-600 text-white shadow"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                }`}
+            >
+              <MdPhoneAndroid size={15} />
+              App Users ({appCount})
+            </button>
+          </div>
+
+          <div className="p-6">
             {loading ? (
               <div className="py-12 text-center text-gray-500">
                 Loading passengers...
@@ -180,24 +258,25 @@ const PassengerList = () => {
                       <th className="px-4 py-3">Name</th>
                       <th className="px-4 py-3">Phone</th>
                       <th className="px-4 py-3">Email</th>
+                      <th className="px-4 py-3">Source</th>
                       <th className="px-4 py-3">Status</th>
                       <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {passengers.length === 0 && (
+                    {filteredPassengers.length === 0 && (
                       <tr>
                         <td
-                          colSpan="6"
+                          colSpan="7"
                           className="px-4 py-8 text-center text-gray-500"
                         >
-                          No passengers registered yet.
+                          No passengers found.
                         </td>
                       </tr>
                     )}
-                    {passengers.map((p) => (
+                    {filteredPassengers.map((p) => (
                       <tr
-                        key={p.id}
+                        key={`${p.source}-${p.id}`}
                         className="border-t border-gray-100 hover:bg-gray-50/50"
                       >
                         <td className="px-4 py-3 font-medium text-gray-900">
@@ -206,6 +285,31 @@ const PassengerList = () => {
                         <td className="px-4 py-3">{p.fullName}</td>
                         <td className="px-4 py-3">{p.phone}</td>
                         <td className="px-4 py-3">{p.email || "-"}</td>
+                        <td className="px-4 py-3">
+                          {p.source === "app" ? (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium"
+                              style={{
+                                backgroundColor: "#dbeafe",
+                                color: "#1e40af",
+                              }}
+                            >
+                              <MdPhoneAndroid size={12} />
+                              App
+                            </span>
+                          ) : (
+                            <span
+                              className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium"
+                              style={{
+                                backgroundColor: "#d1fae5",
+                                color: "#065f46",
+                              }}
+                            >
+                              <MdPersonAdd size={12} />
+                              Registered
+                            </span>
+                          )}
+                        </td>
                         <td className="px-4 py-3">
                           <span
                             className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
@@ -233,54 +337,58 @@ const PassengerList = () => {
                             >
                               <MdVisibility size={18} />
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => openEdit(p)}
-                              className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-emerald-600 transition"
-                              title="Edit passenger"
-                            >
-                              <MdEdit size={18} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setConfirmAction({
-                                  type: "status",
-                                  passenger: p,
-                                  message:
-                                    p.status === "Active"
-                                      ? "Deactivate this passenger? They will be marked as Blocked."
-                                      : "Activate this passenger?",
-                                })
-                              }
-                              className={`p-2 rounded-lg transition ${
-                                p.status === "Active"
-                                  ? "text-gray-600 hover:bg-orange-50 hover:text-orange-600"
-                                  : "text-gray-600 hover:bg-green-50 hover:text-green-600"
-                              }`}
-                              title={p.status === "Active" ? "Deactivate" : "Activate"}
-                            >
-                              {p.status === "Active" ? (
-                                <MdBlock size={18} />
-                              ) : (
-                                <MdCheckCircle size={18} />
-                              )}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setConfirmAction({
-                                  type: "delete",
-                                  passenger: p,
-                                  message:
-                                    "Permanently delete this passenger? This cannot be undone.",
-                                })
-                              }
-                              className="p-2 rounded-lg text-gray-600 hover:bg-red-50 hover:text-red-600 transition"
-                              title="Delete"
-                            >
-                              <MdDelete size={18} />
-                            </button>
+                            {/* Only show edit/status/delete for registered passengers */}
+                            {p.source === "registered" && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => openEdit(p)}
+                                  className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 hover:text-emerald-600 transition"
+                                  title="Edit passenger"
+                                >
+                                  <MdEdit size={18} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setConfirmAction({
+                                      type: "status",
+                                      passenger: p,
+                                      message:
+                                        p.status === "Active"
+                                          ? "Deactivate this passenger? They will be marked as Blocked."
+                                          : "Activate this passenger?",
+                                    })
+                                  }
+                                  className={`p-2 rounded-lg transition ${p.status === "Active"
+                                      ? "text-gray-600 hover:bg-orange-50 hover:text-orange-600"
+                                      : "text-gray-600 hover:bg-green-50 hover:text-green-600"
+                                    }`}
+                                  title={p.status === "Active" ? "Deactivate" : "Activate"}
+                                >
+                                  {p.status === "Active" ? (
+                                    <MdBlock size={18} />
+                                  ) : (
+                                    <MdCheckCircle size={18} />
+                                  )}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setConfirmAction({
+                                      type: "delete",
+                                      passenger: p,
+                                      message:
+                                        "Permanently delete this passenger? This cannot be undone.",
+                                    })
+                                  }
+                                  className="p-2 rounded-lg text-gray-600 hover:bg-red-50 hover:text-red-600 transition"
+                                  title="Delete"
+                                >
+                                  <MdDelete size={18} />
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -300,11 +408,13 @@ const PassengerList = () => {
             <div
               className="px-6 py-4 flex items-center justify-between rounded-t-2xl"
               style={{
-                background: "linear-gradient(135deg, #27ae60 0%, #16c98d 100%)",
+                background: viewPassenger.source === "app"
+                  ? "linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)"
+                  : "linear-gradient(135deg, #27ae60 0%, #16c98d 100%)",
               }}
             >
               <h3 className="text-lg font-bold text-white">
-                Passenger Details
+                {viewPassenger.source === "app" ? "App User Details" : "Passenger Details"}
               </h3>
               <button
                 type="button"
@@ -316,36 +426,76 @@ const PassengerList = () => {
             </div>
             <div className="p-6 space-y-3">
               <div>
-                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Passenger ID</div>
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  {viewPassenger.source === "app" ? "User ID" : "Passenger ID"}
+                </div>
                 <div className="font-semibold text-gray-900">{viewPassenger.passengerId}</div>
               </div>
               <div>
-                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Full Name</div>
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  {viewPassenger.source === "app" ? "Username" : "Full Name"}
+                </div>
                 <div className="text-gray-900">{viewPassenger.fullName}</div>
               </div>
-              <div>
-                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">NIC / Passport</div>
-                <div className="text-gray-900">{viewPassenger.nicPassport}</div>
-              </div>
-              <div>
-                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Phone</div>
-                <div className="text-gray-900">{viewPassenger.phone}</div>
-              </div>
+              {viewPassenger.source === "registered" && (
+                <>
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">NIC / Passport</div>
+                    <div className="text-gray-900">{viewPassenger.nicPassport}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Phone</div>
+                    <div className="text-gray-900">{viewPassenger.phone}</div>
+                  </div>
+                </>
+              )}
               <div>
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Email</div>
                 <div className="text-gray-900">{viewPassenger.email || "-"}</div>
               </div>
-              <div>
-                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Gender</div>
-                <div className="text-gray-900">{viewPassenger.gender}</div>
-              </div>
-              <div>
-                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Date of Birth</div>
-                <div className="text-gray-900">
-                  {viewPassenger.dateOfBirth
-                    ? new Date(viewPassenger.dateOfBirth).toLocaleDateString()
-                    : "-"}
+              {viewPassenger.source === "registered" && (
+                <>
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Gender</div>
+                    <div className="text-gray-900">{viewPassenger.gender}</div>
+                  </div>
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Date of Birth</div>
+                    <div className="text-gray-900">
+                      {viewPassenger.dateOfBirth
+                        ? new Date(viewPassenger.dateOfBirth).toLocaleDateString()
+                        : "-"}
+                    </div>
+                  </div>
+                </>
+              )}
+              {viewPassenger.source === "app" && viewPassenger.uid && (
+                <div>
+                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Firebase UID</div>
+                  <div className="text-gray-600 text-sm font-mono">{viewPassenger.uid}</div>
                 </div>
+              )}
+              <div>
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  Source
+                </div>
+                {viewPassenger.source === "app" ? (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium"
+                    style={{ backgroundColor: "#dbeafe", color: "#1e40af" }}
+                  >
+                    <MdPhoneAndroid size={12} />
+                    Mobile App
+                  </span>
+                ) : (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium"
+                    style={{ backgroundColor: "#d1fae5", color: "#065f46" }}
+                  >
+                    <MdPersonAdd size={12} />
+                    Web Registration
+                  </span>
+                )}
               </div>
               <div>
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Status</div>
@@ -362,7 +512,9 @@ const PassengerList = () => {
               </div>
               {viewPassenger.createdAt && (
                 <div>
-                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Registered</div>
+                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    {viewPassenger.source === "app" ? "Joined" : "Registered"}
+                  </div>
                   <div className="text-gray-600 text-sm">
                     {new Date(viewPassenger.createdAt).toLocaleString()}
                   </div>
@@ -370,17 +522,19 @@ const PassengerList = () => {
               )}
             </div>
             <div className="px-6 py-4 border-t flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const p = viewPassenger;
-                  setViewPassenger(null);
-                  openEdit(p);
-                }}
-                className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700"
-              >
-                Edit
-              </button>
+              {viewPassenger.source === "registered" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const p = viewPassenger;
+                    setViewPassenger(null);
+                    openEdit(p);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-medium hover:bg-emerald-700"
+                >
+                  Edit
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setViewPassenger(null)}
@@ -526,11 +680,10 @@ const PassengerList = () => {
                     handleDelete(confirmAction.passenger);
                   }
                 }}
-                className={`px-4 py-2 rounded-xl font-medium text-white ${
-                  confirmAction.type === "delete"
+                className={`px-4 py-2 rounded-xl font-medium text-white ${confirmAction.type === "delete"
                     ? "bg-red-600 hover:bg-red-700"
                     : "bg-emerald-600 hover:bg-emerald-700"
-                }`}
+                  }`}
               >
                 {confirmAction.type === "delete" ? "Delete" : "Confirm"}
               </button>
