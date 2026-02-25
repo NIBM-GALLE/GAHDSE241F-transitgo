@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FcGoogle } from "react-icons/fc";
-import SignupImage from "../../assets/img.png";
+import SignupImage from "../../assets/TransitGo1_.png";
 import { signInWithEmail, signInWithGoogle } from "../../firebase/auth";
 
 const Signin = () => {
@@ -77,7 +77,7 @@ const Signin = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#b9f3f4] px-4 py-10">
+    <div className="min-h-screen flex items-center justify-center bg-[#27ae60] px-4 py-10">
       <div className="w-full max-w-5xl max-h-[640px] flex flex-col md:flex-row rounded-3xl overflow-hidden shadow-2xl bg-white">
         <img
           src={SignupImage}
@@ -119,7 +119,7 @@ const Signin = () => {
             <button
               type="submit"
               disabled={loading}
-              className="mt-3 ml-18 w-85 inline-flex items-center justify-center px-6 py-3 rounded-full bg-teal-600 text-white text-base font-semibold shadow-lg hover:bg-teal-700 hover:shadow-xl transform hover:-translate-y-0.5 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="mt-3 ml-18 w-85 inline-flex items-center justify-center px-6 py-3 rounded-full bg-[#27ae60] text-white text-base font-semibold shadow-lg hover:bg-[#1fd66b] hover:shadow-xl transform hover:-translate-y-0.5 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Signing In..." : "Sign In"}
             </button>

@@ -33,7 +33,9 @@ const MainLayout = () => {
           marginTop: isMobile ? 0 : 64,
           marginLeft: isMobile ? 0 : (sidebarOpen ? 296 : 64),
           position: 'relative',
-          transition: 'margin-left 0.3s ease-in-out'
+          transition: 'margin-left 0.3s ease-in-out',
+          height: isMobile ? '100vh' : 'calc(100vh - 64px)',
+          overflowY: 'auto',
         }}
       >
         <Outlet />

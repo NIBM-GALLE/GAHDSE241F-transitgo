@@ -161,7 +161,7 @@ const BusRoute = () => {
     }
   };
 
-  // 🔹 Handle Route Edit
+  // Handle Route Edit
   const handleRouteEdit = (route) => {
     setEditingRoute(route);
     setRouteForm({
@@ -174,7 +174,7 @@ const BusRoute = () => {
     setSelectedRoute(null);
   };
 
-  // 🔹 Handle Route Update
+  // Handle Route Update
   const handleRouteUpdate = async () => {
     if (!routeForm.routeNumber || !routeForm.start || !routeForm.destination) {
       toast.error("Required fields missing");
@@ -202,7 +202,7 @@ const BusRoute = () => {
     }
   };
 
-  // 🔹 Handle Route Delete
+  // Handle Route Delete
   const handleRouteDelete = async (routeId) => {
     try {
       setLoading(true);
@@ -219,7 +219,7 @@ const BusRoute = () => {
     }
   };
 
-  // 🔹 Handle Bus Edit
+  // Handle Bus Edit
   const handleBusEdit = (bus) => {
     setEditingBus(bus);
     setBusForm({
@@ -231,7 +231,7 @@ const BusRoute = () => {
     setSelectedBus(null);
   };
 
-  // 🔹 Handle Bus Update
+  // Handle Bus Update
   const handleBusUpdate = async () => {
     if (!busForm.busNumber || !busForm.driverName) {
       toast.error("Required fields missing");
@@ -258,7 +258,7 @@ const BusRoute = () => {
     }
   };
 
-  // 🔹 Handle Bus Delete
+  // Handle Bus Delete
   const handleBusDelete = async (busId) => {
     try {
       setLoading(true);
@@ -334,7 +334,6 @@ const BusRoute = () => {
               </div>
             )}
 
-            {/* Buses Table for Selected Destination */}
             {!loading && destination && (
               <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
@@ -444,7 +443,6 @@ const BusRoute = () => {
               </div>
             )}
 
-            {/* Routes Table (shown when no destination is selected) */}
             {!loading && !destination && filteredRoutes.length > 0 && (
               <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Available Routes</h3>
@@ -556,6 +554,7 @@ const BusRoute = () => {
                           <th className="px-4 py-3 text-left font-semibold">Driver</th>
                           <th className="px-4 py-3 text-left font-semibold">Capacity</th>
                           <th className="px-4 py-3 text-left font-semibold">Contact</th>
+                          <th className="px-4 py-3 text-left font-semibold">Schedule</th>
                           <th className="px-4 py-3 text-left font-semibold">QR Code</th>
                           <th className="px-4 py-3 text-left font-semibold">Actions</th>
                         </tr>
@@ -578,6 +577,14 @@ const BusRoute = () => {
                               </span>
                             </td>
                             <td className="px-4 py-3">{bus.contact || '-'}</td>
+                            <td className="px-4 py-3">
+                              <button
+                                onClick={() => handleScheduleBus(bus)}
+                                className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 transition shadow-sm"
+                              >
+                                Schedule
+                              </button>
+                            </td>
                             <td className="px-4 py-3">
                               {bus.qrCode ? (
                                 <img
