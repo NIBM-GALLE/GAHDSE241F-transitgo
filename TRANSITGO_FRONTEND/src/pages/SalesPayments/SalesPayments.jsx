@@ -3,7 +3,7 @@ import React from "react";
 const SalesPayments = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-gray-100 p-4">
-      <div className="w-full max-w-6xl mx-auto">
+      <div className="w-full max-w-7xl mx-auto">
         <div className="rounded-3xl border border-gray-200 bg-white shadow-lg overflow-hidden">
           {/* Header */}
           <div

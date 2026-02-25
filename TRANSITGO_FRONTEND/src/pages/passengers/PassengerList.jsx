@@ -150,7 +150,7 @@ const PassengerList = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-gray-100 p-4">
-      <div className="w-full max-w-6xl mx-auto">
+      <div className="w-full max-w-8xl mx-auto">
         <div className="rounded-3xl border border-gray-200 bg-white shadow-lg overflow-hidden">
           <div
             className="px-6 py-5"

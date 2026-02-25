@@ -128,7 +128,7 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-gray-100 p-4">
-      <div className="w-full max-w-6xl mx-auto space-y-6">
+      <div className="w-full max-w-8xl mx-auto space-y-6">
         {/* Header */}
         <div className="rounded-3xl border border-gray-200 bg-white shadow-lg overflow-hidden">
           <div
