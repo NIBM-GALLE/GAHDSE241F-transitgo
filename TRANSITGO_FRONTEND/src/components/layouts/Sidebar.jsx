@@ -12,7 +12,7 @@ import { RiCalendarScheduleFill } from "react-icons/ri";
 import { FaTicket } from "react-icons/fa6";
 import { TbReportAnalytics } from "react-icons/tb";
 import { FiLogOut } from "react-icons/fi";
-import logo from '../../assets/Logo.png';
+import logo from "../../assets/TransitGo_logo.png";
 import { signOutUser } from "../../firebase/auth";
 
 const sidebarSections = [
@@ -46,12 +46,6 @@ const sidebarSections = [
     header: "TICKET SECTION",
     items: [
       { label: "Sales & Payments", icon: <FaTicket size={16} />, to: "/home/accounts" }
-    ]
-  },
-  {
-    header: "REPORTS",
-    items: [
-      { label: "Reports", icon: <TbReportAnalytics size={16} />, to: "/payments" }
     ]
   },
 ];
@@ -118,8 +112,8 @@ const Sidebar = ({ sidebarOpen, toggleSidebar, isMobile = false }) => {
               className={`transition-all`}
               style={{
                 objectFit: "contain",
-                height: 100,
-                width: 120,
+                height: 150,
+                width: 180,
                 borderRadius: 8,
                 transition: 'opacity 0.3s ease-in-out, transform 0.3s ease-in-out'
               }}
