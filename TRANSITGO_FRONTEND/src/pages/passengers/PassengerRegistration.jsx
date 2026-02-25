@@ -6,6 +6,7 @@ import {
   serverTimestamp,
   getDocs,
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 
 const PassengerRegistration = () => {
   const [form, setForm] = useState({
@@ -55,15 +56,15 @@ const PassengerRegistration = () => {
     e.preventDefault();
 
     if (!form.fullName?.trim() || !form.nicPassport?.trim() || !form.phone?.trim()) {
-      setStatus({ type: "error", msg: "Full Name, NIC/Passport and Phone are required." });
+      toast.error("Full Name, NIC/Passport and Phone are required.");
       return;
     }
     if (!form.gender) {
-      setStatus({ type: "error", msg: "Please select Gender." });
+      toast.error("Please select Gender.");
       return;
     }
     if (!form.dateOfBirth) {
-      setStatus({ type: "error", msg: "Date of Birth is required." });
+      toast.error("Date of Birth is required.");
       return;
     }
 
@@ -82,7 +83,7 @@ const PassengerRegistration = () => {
         createdAt: serverTimestamp(),
       });
 
-      setStatus({ type: "success", msg: "Passenger registered successfully. ID: " + nextPassengerId });
+      toast.success(`Passenger registered successfully. ID: ${nextPassengerId}`);
       setForm({
         fullName: "",
         nicPassport: "",
@@ -94,7 +95,9 @@ const PassengerRegistration = () => {
       await fetchNextPassengerId();
     } catch (err) {
       console.error(err);
-      setStatus({ type: "error", msg: "Failed to register passenger." });
+      toast.error("Failed to register passenger.");
+    } finally {
+      setStatus(null);
     }
   };
 
@@ -225,17 +228,6 @@ const PassengerRegistration = () => {
                     />
                   </div>
                 </div>
-
-                {status?.type === "success" && (
-                  <div className="mt-5 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-green-800">
-                    <div className="font-medium">{status.msg}</div>
-                  </div>
-                )}
-                {status?.type === "error" && (
-                  <div className="mt-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800">
-                    <div className="font-medium">{status.msg}</div>
-                  </div>
-                )}
 
                 <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                   <button

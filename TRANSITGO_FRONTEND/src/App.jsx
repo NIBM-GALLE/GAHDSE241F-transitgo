@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
 import MainLayout from "./components/layouts/MainLayout";
 import BusRegistration from "./pages/registration/BusRegistration";
 import Home from "./pages/Dashboard";
@@ -12,26 +13,39 @@ import PassengerList from "./pages/passengers/PassengerList";
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Login first: default route */}
-        <Route path="/" element={<Signin />} />
-        <Route path="/signin" element={<Signin />} />
-        <Route path="/signup" element={<Signup />} />
+    <>
+      <BrowserRouter>
+        <Routes>
+          {/* Login first: default route */}
+          <Route path="/" element={<Signin />} />
+          <Route path="/signin" element={<Signin />} />
+          <Route path="/signup" element={<Signup />} />
 
-        {/* Home and app routes (after login) */}
-        <Route path="/home" element={<MainLayout />}>
-          <Route index element={<Home />} />
-          <Route path="bus_registration" element={<BusRegistration />} />
-          <Route path="bus_routes" element={<BusRoute />} />
-          <Route path="route_registration" element={<RouteRegistration />} />
-          <Route path="accounts" element={<SalesPayments />} />
-          <Route path="passenger_registration" element={<PassengerRegistration />} />
-          <Route path="passengers" element={<PassengerList />} />
-        </Route>
+          {/* Home and app routes (after login) */}
+          <Route path="/home" element={<MainLayout />}>
+            <Route index element={<Home />} />
+            <Route path="bus_registration" element={<BusRegistration />} />
+            <Route path="bus_routes" element={<BusRoute />} />
+            <Route path="route_registration" element={<RouteRegistration />} />
+            <Route path="accounts" element={<SalesPayments />} />
+            <Route path="passenger_registration" element={<PassengerRegistration />} />
+            <Route path="passengers" element={<PassengerList />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
 
-      </Routes>
-    </BrowserRouter>
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={false}
+        newestOnTop
+        closeOnClick
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
+    </>
   );
 }
 

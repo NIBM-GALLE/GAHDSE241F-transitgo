@@ -11,6 +11,7 @@ import {
   deleteDoc,
   doc
 } from "firebase/firestore";
+import { toast } from "react-toastify";
 
 const RouteRegistration = () => {
   const [form, setForm] = useState({
@@ -56,7 +57,7 @@ const RouteRegistration = () => {
     e.preventDefault();
 
     if (!form.routeNumber || !form.start || !form.destination) {
-      setStatus({ type: "error", msg: "Required fields missing" });
+      toast.error("Required fields missing");
       return;
     }
 
@@ -64,7 +65,6 @@ const RouteRegistration = () => {
       setStatus({ type: "loading" });
 
       if (editingRoute) {
-        // Update existing route
         await updateDoc(doc(db, "routes", editingRoute.id), {
           routeNumber: form.routeNumber,
           start: form.start,
@@ -73,10 +73,9 @@ const RouteRegistration = () => {
           fare: Number(form.fare) || 0,
         });
 
-        setStatus({ type: "success", msg: "Route updated successfully 🚏" });
+        toast.success("Route updated successfully 🚏");
         setEditingRoute(null);
       } else {
-        // Create new route
         await addDoc(collection(db, "routes"), {
           routeNumber: form.routeNumber,
           start: form.start,
@@ -87,7 +86,7 @@ const RouteRegistration = () => {
           createdAt: serverTimestamp()
         });
 
-        setStatus({ type: "success", msg: "Route saved successfully 🚏" });
+        toast.success("Route saved successfully 🚏");
       }
 
       setForm({
@@ -101,7 +100,9 @@ const RouteRegistration = () => {
       fetchRoutes();
     } catch (err) {
       console.error(err);
-      setStatus({ type: "error", msg: editingRoute ? "Failed to update route" : "Failed to save route" });
+      toast.error(editingRoute ? "Failed to update route" : "Failed to save route");
+    } finally {
+      setStatus(null);
     }
   };
 
@@ -138,13 +139,15 @@ const RouteRegistration = () => {
     try {
       setStatus({ type: "loading" });
       await deleteDoc(doc(db, "routes", routeId));
-      setStatus({ type: "success", msg: "Route deleted successfully 🗑️" });
+      toast.success("Route deleted successfully 🗑️");
       setDeleteConfirm(null);
       fetchRoutes();
     } catch (err) {
       console.error(err);
-      setStatus({ type: "error", msg: "Failed to delete route" });
+      toast.error("Failed to delete route");
       setDeleteConfirm(null);
+    } finally {
+      setStatus(null);
     }
   };
 
@@ -262,19 +265,6 @@ const RouteRegistration = () => {
                 </button>
               </div>
             </form>
-
-            {/* Status */}
-            {status?.type === "success" && (
-              <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-green-800">
-                <div className="font-medium">{status.msg}</div>
-              </div>
-            )}
-
-            {status?.type === "error" && (
-              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-red-800">
-                <div className="font-medium">{status.msg}</div>
-              </div>
-            )}
 
             {/* Table */}
             <div className="mt-8 overflow-x-auto rounded-xl border border-gray-200">
