@@ -103,7 +103,7 @@ const PassengerRegistration = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-gray-100 flex items-start justify-center p-4">
-      <div className="w-full max-w-3xl">
+      <div className="w-full max-w-8xl">
         <div className="rounded-3xl border border-gray-200 bg-white shadow-lg">
           <div
             className="rounded-t-3xl px-6 py-5"
