@@ -8,6 +8,7 @@ import {
     StatusBar,
     ActivityIndicator,
     Alert,
+    Dimensions,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,10 +18,18 @@ import {
     getDocs,
     addDoc,
     serverTimestamp,
+    doc,
+    updateDoc,
+    getDoc,
 } from "firebase/firestore";
 
+const SCREEN_WIDTH = Dimensions.get("window").width;
+const SEAT_COLS = 4;
+const ROW_LABELS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
 const BookTicketScreen = ({ navigation }) => {
-    const [step, setStep] = useState(1); // 1: select route, 2: select schedule, 3: confirm
+    // Steps: 1=Route, 2=Schedule, 3=Seat, 4=Payment, 5=Success (handled via bookingResult)
+    const [step, setStep] = useState(1);
     const [routes, setRoutes] = useState([]);
     const [schedules, setSchedules] = useState([]);
     const [selectedRoute, setSelectedRoute] = useState(null);
@@ -28,7 +37,14 @@ const BookTicketScreen = ({ navigation }) => {
     const [loading, setLoading] = useState(true);
     const [booking, setBooking] = useState(false);
     const [bookingResult, setBookingResult] = useState(null);
-    const [seatCount, setSeatCount] = useState(1);
+
+    // Seat selection state
+    const [selectedSeats, setSelectedSeats] = useState([]);
+    const [bookedSeatsMap, setBookedSeatsMap] = useState({});
+    const [loadingSeats, setLoadingSeats] = useState(false);
+
+    // Payment state
+    const [paying, setPaying] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -55,7 +71,7 @@ const BookTicketScreen = ({ navigation }) => {
     const availableSchedules = selectedRoute
         ? schedules.filter(
             (s) =>
-                (s.routeNumber === selectedRoute.routeNumber) &&
+                s.routeNumber === selectedRoute.routeNumber &&
                 s.date >= today &&
                 s.status === "Scheduled"
         )
@@ -64,23 +80,103 @@ const BookTicketScreen = ({ navigation }) => {
     const handleSelectRoute = (route) => {
         setSelectedRoute(route);
         setSelectedSchedule(null);
+        setSelectedSeats([]);
         setStep(2);
     };
 
-    const handleSelectSchedule = (sched) => {
+    const handleSelectSchedule = async (sched) => {
         setSelectedSchedule(sched);
+        setSelectedSeats([]);
+        setLoadingSeats(true);
         setStep(3);
+
+        // Fetch booked seats from the schedule document
+        try {
+            const schedDoc = await getDoc(doc(db, "schedules", sched.id));
+            if (schedDoc.exists()) {
+                const data = schedDoc.data();
+                setBookedSeatsMap(data.bookedSeats || {});
+            } else {
+                setBookedSeatsMap({});
+            }
+        } catch (err) {
+            console.log("Error fetching seats:", err);
+            setBookedSeatsMap({});
+        } finally {
+            setLoadingSeats(false);
+        }
     };
 
-    const handleConfirmBooking = async () => {
+    // Build seat grid from bus capacity
+    const getBusCapacity = () => {
+        if (!selectedSchedule) return 0;
+        // Try to find the bus doc capacity; fall back to 32
+        const bus = selectedSchedule;
+        return bus.capacity || 32;
+    };
+
+    const buildSeatGrid = () => {
+        const capacity = getBusCapacity();
+        const totalRows = Math.ceil(capacity / SEAT_COLS);
+        const rows = [];
+        let seatIndex = 0;
+        for (let r = 0; r < totalRows; r++) {
+            const rowLabel = ROW_LABELS[r] || `R${r + 1}`;
+            const seats = [];
+            for (let c = 1; c <= SEAT_COLS; c++) {
+                if (seatIndex < capacity) {
+                    const seatId = `${rowLabel}${c}`;
+                    seats.push(seatId);
+                    seatIndex++;
+                }
+            }
+            rows.push({ label: rowLabel, seats });
+        }
+        return rows;
+    };
+
+    const isSeatBooked = (seatId) => !!bookedSeatsMap[seatId];
+
+    const isSeatSelected = (seatId) => selectedSeats.includes(seatId);
+
+    const toggleSeat = (seatId) => {
+        if (isSeatBooked(seatId)) return; // Can't select booked seats
+        setSelectedSeats((prev) =>
+            prev.includes(seatId)
+                ? prev.filter((s) => s !== seatId)
+                : [...prev, seatId]
+        );
+    };
+
+    const getSeatStyle = (seatId) => {
+        if (isSeatBooked(seatId)) return styles.seatBooked;
+        if (isSeatSelected(seatId)) return styles.seatChosen;
+        return styles.seatAvailable;
+    };
+
+    const getSeatTextStyle = (seatId) => {
+        if (isSeatBooked(seatId)) return styles.seatTextBooked;
+        if (isSeatSelected(seatId)) return styles.seatTextChosen;
+        return styles.seatTextAvailable;
+    };
+
+    // Dummy Payment
+    const handlePayment = async () => {
         const user = auth.currentUser;
         if (!user) {
             Alert.alert("Error", "Please sign in to book a ticket.");
             return;
         }
 
-        setBooking(true);
+        setPaying(true);
+
+        // Simulate payment processing (2-second delay)
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
         try {
+            const fare = selectedRoute.fare || 0;
+            const totalFare = fare * selectedSeats.length;
+
             const bookingData = {
                 userId: user.uid,
                 userName: user.displayName || user.email,
@@ -93,14 +189,27 @@ const BookTicketScreen = ({ navigation }) => {
                 via: selectedRoute.via || "",
                 date: selectedSchedule.date,
                 time: selectedSchedule.time,
-                fare: selectedRoute.fare || 0,
-                totalFare: (selectedRoute.fare || 0) * seatCount,
-                seatCount: seatCount,
+                fare: fare,
+                totalFare: totalFare,
+                seatCount: selectedSeats.length,
+                seats: selectedSeats,
                 status: "Confirmed",
+                paymentStatus: "Paid",
+                paymentMethod: "Dummy Payment",
                 createdAt: serverTimestamp(),
             };
 
             await addDoc(collection(db, "bookings"), bookingData);
+
+            // Update booked seats on the schedule document
+            const updatedBookedSeats = { ...bookedSeatsMap };
+            selectedSeats.forEach((seatId) => {
+                updatedBookedSeats[seatId] = user.uid;
+            });
+
+            await updateDoc(doc(db, "schedules", selectedSchedule.id), {
+                bookedSeats: updatedBookedSeats,
+            });
 
             setBookingResult({
                 ...bookingData,
@@ -111,7 +220,7 @@ const BookTicketScreen = ({ navigation }) => {
             console.log("Booking error:", err);
             Alert.alert("Error", "Failed to book ticket. Please try again.");
         } finally {
-            setBooking(false);
+            setPaying(false);
         }
     };
 
@@ -119,11 +228,12 @@ const BookTicketScreen = ({ navigation }) => {
         setStep(1);
         setSelectedRoute(null);
         setSelectedSchedule(null);
+        setSelectedSeats([]);
+        setBookedSeatsMap({});
         setBookingResult(null);
-        setSeatCount(1);
     };
 
-    // Booking success
+    // ─── BOOKING SUCCESS SCREEN ───
     if (bookingResult) {
         return (
             <View style={styles.container}>
@@ -134,7 +244,7 @@ const BookTicketScreen = ({ navigation }) => {
                             <Ionicons name="checkmark-circle" size={72} color="#27ae60" />
                         </View>
                         <Text style={styles.successTitle}>Booking Confirmed!</Text>
-                        <Text style={styles.successSub}>Your ticket has been booked successfully</Text>
+                        <Text style={styles.successSub}>Your ticket has been booked & paid successfully</Text>
 
                         <View style={styles.ticketCard}>
                             <View style={styles.ticketHeader}>
@@ -182,7 +292,11 @@ const BookTicketScreen = ({ navigation }) => {
                             </View>
                             <View style={styles.ticketRow}>
                                 <Text style={styles.ticketLabel}>Seats</Text>
-                                <Text style={styles.ticketValue}>{bookingResult.seatCount}</Text>
+                                <Text style={styles.ticketValue}>{bookingResult.seats.join(", ")}</Text>
+                            </View>
+                            <View style={styles.ticketRow}>
+                                <Text style={styles.ticketLabel}>Payment</Text>
+                                <Text style={[styles.ticketValue, { color: "#16c98d" }]}>✓ Paid</Text>
                             </View>
 
                             <View style={styles.ticketDivider} />
@@ -214,6 +328,10 @@ const BookTicketScreen = ({ navigation }) => {
         );
     }
 
+    // ─── MAIN BOOKING FLOW ───
+    const stepLabels = ["Route", "Schedule", "Seats", "Payment"];
+    const totalSteps = 4;
+
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" />
@@ -221,19 +339,21 @@ const BookTicketScreen = ({ navigation }) => {
             <LinearGradient colors={["#0f2027", "#203a43", "#2c5364"]} style={styles.header}>
                 <Text style={styles.headerTitle}>🎫 Book a Ticket</Text>
                 <View style={styles.stepIndicator}>
-                    {[1, 2, 3].map((s) => (
+                    {Array.from({ length: totalSteps }, (_, i) => i + 1).map((s) => (
                         <View key={s} style={styles.stepRow}>
                             <View style={[styles.stepCircle, step >= s && styles.stepCircleActive]}>
                                 <Text style={[styles.stepNum, step >= s && styles.stepNumActive]}>{s}</Text>
                             </View>
-                            {s < 3 && <View style={[styles.stepLine, step > s && styles.stepLineActive]} />}
+                            {s < totalSteps && <View style={[styles.stepLine, step > s && styles.stepLineActive]} />}
                         </View>
                     ))}
                 </View>
                 <View style={styles.stepLabels}>
-                    <Text style={[styles.stepLabel, step >= 1 && styles.stepLabelActive]}>Route</Text>
-                    <Text style={[styles.stepLabel, step >= 2 && styles.stepLabelActive]}>Schedule</Text>
-                    <Text style={[styles.stepLabel, step >= 3 && styles.stepLabelActive]}>Confirm</Text>
+                    {stepLabels.map((label, i) => (
+                        <Text key={i} style={[styles.stepLabel, step >= i + 1 && styles.stepLabelActive]}>
+                            {label}
+                        </Text>
+                    ))}
                 </View>
             </LinearGradient>
 
@@ -244,7 +364,7 @@ const BookTicketScreen = ({ navigation }) => {
                 </View>
             ) : (
                 <ScrollView style={styles.content} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
-                    {/* Step 1: Select Route */}
+                    {/* ─── Step 1: Select Route ─── */}
                     {step === 1 && (
                         <>
                             <Text style={styles.sectionTitle}>Select a Route</Text>
@@ -285,7 +405,7 @@ const BookTicketScreen = ({ navigation }) => {
                         </>
                     )}
 
-                    {/* Step 2: Select Schedule */}
+                    {/* ─── Step 2: Select Schedule ─── */}
                     {step === 2 && (
                         <>
                             <TouchableOpacity style={styles.backBtn} onPress={() => setStep(1)}>
@@ -329,7 +449,7 @@ const BookTicketScreen = ({ navigation }) => {
                         </>
                     )}
 
-                    {/* Step 3: Confirm Booking */}
+                    {/* ─── Step 3: Seat Selection ─── */}
                     {step === 3 && (
                         <>
                             <TouchableOpacity style={styles.backBtn} onPress={() => setStep(2)}>
@@ -337,89 +457,212 @@ const BookTicketScreen = ({ navigation }) => {
                                 <Text style={styles.backText}>Change Schedule</Text>
                             </TouchableOpacity>
 
-                            <Text style={styles.sectionTitle}>Confirm Your Booking</Text>
+                            <Text style={styles.sectionTitle}>Choose your seat</Text>
 
-                            <View style={styles.confirmCard}>
-                                <View style={styles.confirmRow}>
-                                    <Ionicons name="navigate" size={18} color="#3b82f6" />
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.confirmLabel}>Route {selectedRoute.routeNumber}</Text>
-                                        <Text style={styles.confirmValue}>
-                                            {selectedRoute.start} → {selectedRoute.destination}
-                                        </Text>
-                                    </View>
+                            {loadingSeats ? (
+                                <View style={styles.centerBox}>
+                                    <ActivityIndicator size="large" color="#27ae60" />
+                                    <Text style={styles.loadingText}>Loading seats...</Text>
                                 </View>
-
-                                <View style={styles.confirmDivider} />
-
-                                <View style={styles.confirmRow}>
-                                    <Ionicons name="bus" size={18} color="#27ae60" />
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.confirmLabel}>Bus {selectedSchedule.busNumber}</Text>
-                                        <Text style={styles.confirmValue}>Driver: {selectedSchedule.driverName || "N/A"}</Text>
+                            ) : (
+                                <View style={styles.seatContainer}>
+                                    {/* Steering wheel icon */}
+                                    <View style={styles.steeringRow}>
+                                        <Ionicons name="bus" size={24} color="#94a3b8" />
+                                        <Text style={styles.steeringText}>Front</Text>
                                     </View>
-                                </View>
 
-                                <View style={styles.confirmDivider} />
-
-                                <View style={styles.confirmRow}>
-                                    <Ionicons name="calendar" size={18} color="#f59e0b" />
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={styles.confirmLabel}>{selectedSchedule.date}</Text>
-                                        <Text style={styles.confirmValue}>{selectedSchedule.time}</Text>
+                                    {/* Column headers */}
+                                    <View style={styles.seatGridRow}>
+                                        <View style={styles.rowLabelSpace} />
+                                        <View style={styles.seatCell}>
+                                            <Text style={styles.colHeader}>1</Text>
+                                        </View>
+                                        <View style={styles.seatCell}>
+                                            <Text style={styles.colHeader}>2</Text>
+                                        </View>
+                                        <View style={styles.aisleGap} />
+                                        <View style={styles.seatCell}>
+                                            <Text style={styles.colHeader}>3</Text>
+                                        </View>
+                                        <View style={styles.seatCell}>
+                                            <Text style={styles.colHeader}>4</Text>
+                                        </View>
                                     </View>
-                                </View>
 
-                                <View style={styles.confirmDivider} />
+                                    {/* Seat rows */}
+                                    {buildSeatGrid().map((row) => (
+                                        <View key={row.label} style={styles.seatGridRow}>
+                                            <View style={styles.rowLabelSpace}>
+                                                <Text style={styles.rowLabel}>{row.label}</Text>
+                                            </View>
+                                            {row.seats.map((seatId, colIdx) => (
+                                                <React.Fragment key={seatId}>
+                                                    {colIdx === 2 && <View style={styles.aisleGap} />}
+                                                    <TouchableOpacity
+                                                        style={[styles.seatCell]}
+                                                        onPress={() => toggleSeat(seatId)}
+                                                        activeOpacity={isSeatBooked(seatId) ? 1 : 0.6}
+                                                    >
+                                                        <View style={[styles.seatBox, getSeatStyle(seatId)]}>
+                                                            <Text style={getSeatTextStyle(seatId)}>
+                                                                {isSeatBooked(seatId) ? "✕" : ""}
+                                                            </Text>
+                                                        </View>
+                                                    </TouchableOpacity>
+                                                </React.Fragment>
+                                            ))}
+                                            {/* Fill empty seats if row has less than 4 */}
+                                            {row.seats.length < SEAT_COLS &&
+                                                Array.from({ length: SEAT_COLS - row.seats.length }).map((_, idx) => (
+                                                    <View key={`empty-${idx}`} style={styles.seatCell} />
+                                                ))}
+                                        </View>
+                                    ))}
 
-                                {/* Seat selector */}
-                                <View style={styles.seatRow}>
-                                    <Text style={styles.seatLabel}>Seats</Text>
-                                    <View style={styles.seatCounter}>
-                                        <TouchableOpacity
-                                            style={styles.seatBtn}
-                                            onPress={() => setSeatCount(Math.max(1, seatCount - 1))}
+                                    {/* Legend */}
+                                    <View style={styles.legend}>
+                                        <View style={styles.legendItem}>
+                                            <View style={[styles.legendBox, styles.seatAvailable]} />
+                                            <Text style={styles.legendText}>Available</Text>
+                                        </View>
+                                        <View style={styles.legendItem}>
+                                            <View style={[styles.legendBox, styles.seatBooked]} />
+                                            <Text style={styles.legendText}>Booked</Text>
+                                        </View>
+                                        <View style={styles.legendItem}>
+                                            <View style={[styles.legendBox, styles.seatChosen]} />
+                                            <Text style={styles.legendText}>Chosen</Text>
+                                        </View>
+                                    </View>
+
+                                    {/* Selected seats info */}
+                                    {selectedSeats.length > 0 && (
+                                        <View style={styles.selectedSeatsInfo}>
+                                            <Text style={styles.selectedSeatsLabel}>
+                                                Selected: {selectedSeats.sort().join(", ")}
+                                            </Text>
+                                            <Text style={styles.selectedSeatsFare}>
+                                                Rs. {(selectedRoute.fare || 0) * selectedSeats.length}
+                                            </Text>
+                                        </View>
+                                    )}
+
+                                    {/* Next button */}
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.nextBtn,
+                                            selectedSeats.length === 0 && styles.nextBtnDisabled,
+                                        ]}
+                                        onPress={() => {
+                                            if (selectedSeats.length > 0) setStep(4);
+                                        }}
+                                        disabled={selectedSeats.length === 0}
+                                        activeOpacity={0.8}
+                                    >
+                                        <LinearGradient
+                                            colors={
+                                                selectedSeats.length > 0
+                                                    ? ["#0288D1", "#03A9F4"]
+                                                    : ["#ccc", "#ccc"]
+                                            }
+                                            style={styles.nextBtnGrad}
+                                            start={{ x: 0, y: 0 }}
+                                            end={{ x: 1, y: 0 }}
                                         >
-                                            <Ionicons name="remove" size={18} color="#fff" />
-                                        </TouchableOpacity>
-                                        <Text style={styles.seatNum}>{seatCount}</Text>
-                                        <TouchableOpacity
-                                            style={styles.seatBtn}
-                                            onPress={() => setSeatCount(Math.min(10, seatCount + 1))}
-                                        >
-                                            <Ionicons name="add" size={18} color="#fff" />
-                                        </TouchableOpacity>
-                                    </View>
+                                            <Text style={styles.nextBtnText}>Next</Text>
+                                            <Ionicons name="arrow-forward" size={20} color="#fff" />
+                                        </LinearGradient>
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+                        </>
+                    )}
+
+                    {/* ─── Step 4: Dummy Payment ─── */}
+                    {step === 4 && (
+                        <>
+                            <TouchableOpacity style={styles.backBtn} onPress={() => setStep(3)}>
+                                <Ionicons name="arrow-back" size={18} color="#3b82f6" />
+                                <Text style={styles.backText}>Change Seats</Text>
+                            </TouchableOpacity>
+
+                            <Text style={styles.sectionTitle}>Payment</Text>
+
+                            <View style={styles.paymentCard}>
+                                {/* Payment summary */}
+                                <View style={styles.paymentIcon}>
+                                    <Ionicons name="card" size={40} color="#0288D1" />
+                                </View>
+                                <Text style={styles.paymentTitle}>Payment</Text>
+                                <Text style={styles.paymentSub}>
+                                    This is a simulated payment for demonstration purposes
+                                </Text>
+
+                                <View style={styles.paymentDivider} />
+
+                                <View style={styles.paymentRow}>
+                                    <Text style={styles.paymentLabel}>Route</Text>
+                                    <Text style={styles.paymentValue}>
+                                        {selectedRoute.routeNumber} — {selectedRoute.start} → {selectedRoute.destination}
+                                    </Text>
+                                </View>
+                                <View style={styles.paymentRow}>
+                                    <Text style={styles.paymentLabel}>Bus</Text>
+                                    <Text style={styles.paymentValue}>
+                                        {selectedSchedule.busNumber || "N/A"}
+                                    </Text>
+                                </View>
+                                <View style={styles.paymentRow}>
+                                    <Text style={styles.paymentLabel}>Date & Time</Text>
+                                    <Text style={styles.paymentValue}>
+                                        {selectedSchedule.date} at {selectedSchedule.time}
+                                    </Text>
+                                </View>
+                                <View style={styles.paymentRow}>
+                                    <Text style={styles.paymentLabel}>Seats</Text>
+                                    <Text style={styles.paymentValue}>
+                                        {selectedSeats.sort().join(", ")}
+                                    </Text>
+                                </View>
+                                <View style={styles.paymentRow}>
+                                    <Text style={styles.paymentLabel}>Fare per seat</Text>
+                                    <Text style={styles.paymentValue}>
+                                        Rs. {selectedRoute.fare || 0}
+                                    </Text>
                                 </View>
 
-                                <View style={styles.confirmDivider} />
+                                <View style={styles.paymentDivider} />
 
-                                <View style={styles.totalRow}>
-                                    <Text style={styles.totalLabel}>Total Fare</Text>
-                                    <Text style={styles.totalValue}>
-                                        Rs. {(selectedRoute.fare || 0) * seatCount}
+                                <View style={styles.paymentTotalRow}>
+                                    <Text style={styles.paymentTotalLabel}>Total Amount</Text>
+                                    <Text style={styles.paymentTotalValue}>
+                                        Rs. {(selectedRoute.fare || 0) * selectedSeats.length}
                                     </Text>
                                 </View>
                             </View>
 
                             <TouchableOpacity
-                                style={styles.confirmBtn}
-                                onPress={handleConfirmBooking}
-                                disabled={booking}
+                                style={styles.payBtn}
+                                onPress={handlePayment}
+                                disabled={paying}
                                 activeOpacity={0.8}
                             >
                                 <LinearGradient
                                     colors={["#27ae60", "#16c98d"]}
-                                    style={styles.confirmBtnGrad}
+                                    style={styles.payBtnGrad}
                                     start={{ x: 0, y: 0 }}
                                     end={{ x: 1, y: 0 }}
                                 >
-                                    {booking ? (
-                                        <ActivityIndicator color="#fff" size="small" />
+                                    {paying ? (
+                                        <>
+                                            <ActivityIndicator color="#fff" size="small" />
+                                            <Text style={styles.payBtnText}>Processing Payment...</Text>
+                                        </>
                                     ) : (
                                         <>
-                                            <Ionicons name="checkmark-circle" size={22} color="#fff" />
-                                            <Text style={styles.confirmBtnText}>Confirm Booking</Text>
+                                            <Ionicons name="wallet" size={22} color="#fff" />
+                                            <Text style={styles.payBtnText}>Pay Now</Text>
                                         </>
                                     )}
                                 </LinearGradient>
@@ -451,12 +694,12 @@ const styles = StyleSheet.create({
     stepCircleActive: { backgroundColor: "#27ae60", borderColor: "#27ae60" },
     stepNum: { fontSize: 13, fontWeight: "700", color: "rgba(255,255,255,0.3)" },
     stepNumActive: { color: "#fff" },
-    stepLine: { width: 50, height: 2, backgroundColor: "rgba(255,255,255,0.1)", marginHorizontal: 4 },
+    stepLine: { width: 36, height: 2, backgroundColor: "rgba(255,255,255,0.1)", marginHorizontal: 4 },
     stepLineActive: { backgroundColor: "#27ae60" },
     stepLabels: { flexDirection: "row", justifyContent: "space-around", marginTop: 8 },
     stepLabel: { fontSize: 11, color: "rgba(255,255,255,0.3)", fontWeight: "600" },
     stepLabelActive: { color: "rgba(255,255,255,0.8)" },
-    centerBox: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12 },
+    centerBox: { flex: 1, justifyContent: "center", alignItems: "center", gap: 12, paddingVertical: 40 },
     loadingText: { fontSize: 14, color: "#64748b" },
     content: { flex: 1, paddingHorizontal: 20, paddingTop: 16 },
     sectionTitle: { fontSize: 18, fontWeight: "700", color: "#1e293b", marginBottom: 14 },
@@ -528,40 +771,109 @@ const styles = StyleSheet.create({
     schedDate: { fontSize: 13, fontWeight: "600", color: "#1e293b" },
     schedTime: { fontSize: 12, color: "#27ae60", fontWeight: "600", marginTop: 2 },
 
-    // Confirm
-    confirmCard: {
+    // ─── Seat Selection ───
+    seatContainer: {
         backgroundColor: "#fff",
-        borderRadius: 18,
-        padding: 20,
-        marginBottom: 20,
-        elevation: 2,
+        borderRadius: 20,
+        padding: 16,
+        elevation: 3,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
     },
-    confirmRow: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingVertical: 4 },
-    confirmLabel: { fontSize: 14, fontWeight: "700", color: "#1e293b" },
-    confirmValue: { fontSize: 13, color: "#64748b", marginTop: 2 },
-    confirmDivider: { height: 1, backgroundColor: "#f1f5f9", marginVertical: 12 },
-    seatRow: {
+    steeringRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        marginBottom: 12,
+        paddingBottom: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: "#f1f5f9",
+    },
+    steeringText: { fontSize: 12, color: "#94a3b8", fontWeight: "600" },
+    seatGridRow: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "center",
+        marginBottom: 8,
+    },
+    rowLabelSpace: {
+        width: 24,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    rowLabel: { fontSize: 12, fontWeight: "700", color: "#94a3b8" },
+    colHeader: { fontSize: 12, fontWeight: "700", color: "#94a3b8", textAlign: "center" },
+    seatCell: {
+        width: (SCREEN_WIDTH - 120) / 4,
+        height: (SCREEN_WIDTH - 120) / 4,
+        maxWidth: 60,
+        maxHeight: 60,
+        alignItems: "center",
+        justifyContent: "center",
+        marginHorizontal: 3,
+    },
+    aisleGap: { width: 20 },
+    seatBox: {
+        width: "88%",
+        height: "88%",
+        borderRadius: 10,
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    seatAvailable: {
+        backgroundColor: "#fff",
+        borderWidth: 2,
+        borderColor: "#d1d5db",
+    },
+    seatBooked: {
+        backgroundColor: "#B3E5FC",
+        borderWidth: 2,
+        borderColor: "#81D4FA",
+    },
+    seatChosen: {
+        backgroundColor: "#0288D1",
+        borderWidth: 2,
+        borderColor: "#0277BD",
+    },
+    seatTextAvailable: { fontSize: 10, color: "#94a3b8" },
+    seatTextBooked: { fontSize: 12, color: "#fff", fontWeight: "700" },
+    seatTextChosen: { fontSize: 10, color: "#fff", fontWeight: "700" },
+
+    // Legend
+    legend: {
+        flexDirection: "row",
+        justifyContent: "center",
+        gap: 20,
+        marginTop: 16,
+        paddingTop: 14,
+        borderTopWidth: 1,
+        borderTopColor: "#f1f5f9",
+    },
+    legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
+    legendBox: { width: 22, height: 22, borderRadius: 5 },
+    legendText: { fontSize: 12, color: "#64748b", fontWeight: "600" },
+
+    // Selected seats info
+    selectedSeatsInfo: {
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
-        paddingVertical: 4,
+        marginTop: 14,
+        paddingHorizontal: 4,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: "#f1f5f9",
     },
-    seatLabel: { fontSize: 15, fontWeight: "700", color: "#1e293b" },
-    seatCounter: { flexDirection: "row", alignItems: "center", gap: 12 },
-    seatBtn: {
-        width: 32,
-        height: 32,
-        borderRadius: 8,
-        backgroundColor: "#27ae60",
-        justifyContent: "center",
-        alignItems: "center",
-    },
-    seatNum: { fontSize: 18, fontWeight: "800", color: "#1e293b", minWidth: 24, textAlign: "center" },
-    totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-    totalLabel: { fontSize: 16, fontWeight: "700", color: "#1e293b" },
-    totalValue: { fontSize: 22, fontWeight: "800", color: "#27ae60" },
-    confirmBtn: { borderRadius: 14, overflow: "hidden", marginTop: 4 },
-    confirmBtnGrad: {
+    selectedSeatsLabel: { fontSize: 13, fontWeight: "600", color: "#1e293b", flex: 1 },
+    selectedSeatsFare: { fontSize: 16, fontWeight: "800", color: "#27ae60" },
+
+    // Next button
+    nextBtn: { borderRadius: 14, overflow: "hidden", marginTop: 16 },
+    nextBtnDisabled: { opacity: 0.5 },
+    nextBtnGrad: {
         paddingVertical: 16,
         flexDirection: "row",
         justifyContent: "center",
@@ -569,9 +881,62 @@ const styles = StyleSheet.create({
         gap: 8,
         borderRadius: 14,
     },
-    confirmBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+    nextBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
 
-    // Success
+    // ─── Payment ───
+    paymentCard: {
+        backgroundColor: "#fff",
+        borderRadius: 20,
+        padding: 24,
+        elevation: 3,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        marginBottom: 20,
+        alignItems: "center",
+    },
+    paymentIcon: {
+        width: 72,
+        height: 72,
+        borderRadius: 36,
+        backgroundColor: "#E1F5FE",
+        justifyContent: "center",
+        alignItems: "center",
+        marginBottom: 12,
+    },
+    paymentTitle: { fontSize: 20, fontWeight: "800", color: "#1e293b", marginBottom: 4 },
+    paymentSub: { fontSize: 13, color: "#94a3b8", textAlign: "center", marginBottom: 4 },
+    paymentDivider: { width: "100%", height: 1, backgroundColor: "#f1f5f9", marginVertical: 16 },
+    paymentRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        width: "100%",
+        marginBottom: 10,
+    },
+    paymentLabel: { fontSize: 13, color: "#94a3b8", fontWeight: "600", flex: 0.4 },
+    paymentValue: { fontSize: 13, fontWeight: "600", color: "#1e293b", flex: 0.6, textAlign: "right" },
+    paymentTotalRow: {
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        width: "100%",
+    },
+    paymentTotalLabel: { fontSize: 16, fontWeight: "800", color: "#1e293b" },
+    paymentTotalValue: { fontSize: 24, fontWeight: "800", color: "#27ae60" },
+    payBtn: { borderRadius: 14, overflow: "hidden", marginTop: 4 },
+    payBtnGrad: {
+        paddingVertical: 16,
+        flexDirection: "row",
+        justifyContent: "center",
+        alignItems: "center",
+        gap: 8,
+        borderRadius: 14,
+    },
+    payBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+
+    // ─── Success ───
     successContainer: {
         flexGrow: 1,
         alignItems: "center",
