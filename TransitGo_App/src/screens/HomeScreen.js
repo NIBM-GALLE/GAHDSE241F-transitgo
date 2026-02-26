@@ -7,6 +7,7 @@ import {
     TouchableOpacity,
     StatusBar,
     Dimensions,
+    Image,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -106,11 +107,18 @@ const HomeScreen = ({ navigation }) => {
                 style={styles.header}
             >
                 <View style={styles.headerContent}>
-                    <View>
-                        <Text style={styles.greeting}>Hello,</Text>
-                        <Text style={styles.userName}>
-                            {user?.displayName || "Traveler"} 👋
-                        </Text>
+                    <View style={styles.headerLeft}>
+                        <Image
+                            source={require("../../assets/logo.png")}
+                            style={styles.headerLogo}
+                            resizeMode="contain"
+                        />
+                        <View>
+                            <Text style={styles.greeting}>Hello,</Text>
+                            <Text style={styles.userName}>
+                                {user?.displayName || "Traveler"} 👋
+                            </Text>
+                        </View>
                     </View>
                     <TouchableOpacity
                         style={styles.profileBtn}
@@ -209,6 +217,15 @@ const styles = StyleSheet.create({
         flexDirection: "row",
         justifyContent: "space-between",
         alignItems: "center",
+    },
+    headerLeft: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+    },
+    headerLogo: {
+        width: 42,
+        height: 42,
     },
     greeting: { fontSize: 16, color: "rgba(255,255,255,0.6)" },
     userName: { fontSize: 26, fontWeight: "800", color: "#fff", marginTop: 2 },

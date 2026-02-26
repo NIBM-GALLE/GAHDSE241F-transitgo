@@ -10,6 +10,7 @@ import {
     ScrollView,
     ActivityIndicator,
     StatusBar,
+    Image,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -53,10 +54,11 @@ const SignInScreen = ({ navigation }) => {
                     >
                         {/* Logo Area */}
                         <View style={styles.logoArea}>
-                            <View style={styles.iconCircle}>
-                                <Ionicons name="bus" size={44} color="#16c98d" />
-                            </View>
-                            <Text style={styles.appName}>TransitGo</Text>
+                            <Image
+                                source={require("../../../assets/logo.png")}
+                                style={styles.logoImage}
+                                resizeMode="contain"
+                            />
                             <Text style={styles.tagline}>Your Smart Transit Companion</Text>
                         </View>
 
@@ -166,16 +168,10 @@ const styles = StyleSheet.create({
         paddingVertical: 40,
     },
     logoArea: { alignItems: "center", marginBottom: 36 },
-    iconCircle: {
-        width: 88,
-        height: 88,
-        borderRadius: 44,
-        backgroundColor: "rgba(22,201,141,0.12)",
-        justifyContent: "center",
-        alignItems: "center",
-        marginBottom: 16,
-        borderWidth: 2,
-        borderColor: "rgba(22,201,141,0.3)",
+    logoImage: {
+        width: 160,
+        height: 160,
+        marginBottom: 8,
     },
     appName: {
         fontSize: 34,
